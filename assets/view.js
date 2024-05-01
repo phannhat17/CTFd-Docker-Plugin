@@ -96,7 +96,7 @@ function createChallengeLinkElement(data, parent) {
         parent.append(codeElement);
     } else if (data.connect === "ssh") {
         let codeElement = document.createElement('code');
-        codeElement.textContent = 'ssh [user]@' + data.hostname + " -p" + data.port;
+        codeElement.textContent = 'ssh [user]@' + data.hostname + " -p " + data.port;
         parent.append(codeElement);
     } else {
         let link = document.createElement('a');
