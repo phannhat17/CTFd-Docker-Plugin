@@ -60,27 +60,53 @@ function toggleChallengeCreate() {
     document.getElementById("create-chal").classList.toggle('d-none');
 }
 
-function toggleChallengeUpdate() {
-    document.getElementById("extend-chal").classList.toggle('d-none');
-    document.getElementById("terminate-chal").classList.toggle('d-none');
+function toggleChallengeUpdate(isInfinite, removeTerminate = false) {
+    const extendBtn = document.getElementById("extend-chal");
+    const terminateBtn = document.getElementById("terminate-chal");
+    if (removeTerminate) {
+        terminateBtn.classList.add('d-none');
+    }
+    else{
+        terminateBtn.classList.remove('d-none');
+    }
+    
+    if (isInfinite) {
+        extendBtn.classList.add('d-none');
+    } else {
+        extendBtn.classList.remove('d-none');
+    }
 }
 
 function calculateExpiry(date) {
-    return Math.ceil((new Date(date * 1000) - new Date()) / 1000 / 60);
+    return Math.ceil((new Date(date * 1000) - new Date()) / 1000 / 60);;
 }
 
 function createChallengeLinkElement(data, parent) {
     parent.innerHTML = "";
 
     let expires = document.createElement('span');
-    expires.textContent = "Expires in " + calculateExpiry(new Date(data.expires)) + " minutes.";
-    parent.append(expires, document.createElement('br'));
+    if(data.container_expiration != 0){
+        expires.textContent = "Expires in " + calculateExpiry(new Date(data.expires)) + " minutes.";
+        parent.append(expires, document.createElement('br'));
+    }else{
+        expires.textContent = "No expiration instance limit.";
+        parent.append(expires, document.createElement('br'));
+    }
 
     if (data.connect == "tcp") {
         let codeElement = document.createElement('code');
         codeElement.textContent = 'nc ' + data.hostname + " " + data.port;
         parent.append(codeElement);
-    } else {
+    }else if(data.connect == 'ssh'){
+        let ssh = document.createElement('code');
+        ssh.textContent = 'ssh ' + data.username + "@" + data.hostname + ' -p '  + data.port;
+        let passwordDisplay = document.createElement('code');
+        passwordDisplay.textContent = 'Password: ' + data.password;
+        parent.append(ssh)
+        parent.append(document.createElement('br'));
+        parent.append(passwordDisplay);
+    }
+     else {
         let link = document.createElement('a');
         link.href = 'http://' + data.hostname + ":" + data.port;
         link.textContent = 'http://' + data.hostname + ":" + data.port;
@@ -88,6 +114,7 @@ function createChallengeLinkElement(data, parent) {
         parent.append(link);
     }
 }
+
 
 function view_container_info(challenge_id) {
     let alert = resetAlert();
@@ -103,17 +130,19 @@ function view_container_info(challenge_id) {
     })
     .then(response => response.json())
     .then(data => {
-        alert.innerHTML = ""; // Remove spinner
+        alert.innerHTML = "";
         if (data.status == "Challenge not started") {
             alert.innerHTML = data.status;
             toggleChallengeCreate();
         } else if (data.status == "already_running") {
+            isInfinite = data.container_expiration == 0;
             createChallengeLinkElement(data, alert);
-            toggleChallengeUpdate();
+            toggleChallengeUpdate(isInfinite);
         } else {
             alert.innerHTML = data.message;
             alert.classList.add("alert-danger");
-            toggleChallengeUpdate();
+            isInfinite = data.container_expiration == 0;
+            toggleChallengeUpdate(isInfinite);
         }
     })
     .catch(error => {
@@ -149,7 +178,8 @@ function container_request(challenge_id) {
             toggleChallengeCreate();
         } else {
             createChallengeLinkElement(data, alert);
-            toggleChallengeUpdate();
+            isInfinite = data.container_expiration == 0;
+            toggleChallengeUpdate(isInfinite);
             toggleChallengeCreate();
         }
     })
@@ -208,7 +238,7 @@ function container_stop(challenge_id) {
     })
     .then(response => response.json())
     .then(data => {
-        alert.innerHTML = ""; // Remove spinner
+        alert.innerHTML = "";
         if (data.error) {
             alert.innerHTML = data.error;
             alert.classList.add("alert-danger");
@@ -220,7 +250,7 @@ function container_stop(challenge_id) {
         } else {
             alert.innerHTML = "Challenge Terminated.";
             toggleChallengeCreate();
-            toggleChallengeUpdate();
+            toggleChallengeUpdate(true, true);
         }
     })
     .catch(error => {

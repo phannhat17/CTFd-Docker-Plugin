@@ -15,7 +15,8 @@ class ContainerChallengeModel(Challenges):
     command = db.Column(db.Text, default="")
     volumes = db.Column(db.Text, default="")
     connection_type = db.Column(db.Text)
-
+    password = db.Column(db.Text, default="")
+    username = db.Column(db.Text, default="")
     # Dynamic challenge properties
     initial = db.Column(db.Integer, default=0)
     minimum = db.Column(db.Integer, default=0)

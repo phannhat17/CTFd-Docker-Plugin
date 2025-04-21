@@ -159,8 +159,10 @@ For remote Docker, the CTFd host must have SSH access to the remote server.
 - [x] Admin dashboard with team/user filtering
 - [x] Compatibility with the core-beta theme
 - [x] Monitor share flag 
-- [ ] Monitor detail on share flag 
-- [ ] Prevent container creation on solved challenge
+- [x] Monitor detail on share flag 
+- [x] Prevent container creation on solved challenge
+- [x] Add in Fame or shame 
+
 
 For more features and known issues, check the [open issues](https://github.com/phannhat17/CTFd-Docker-Plugin/issues).
 

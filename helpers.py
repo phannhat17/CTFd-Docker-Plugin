@@ -5,9 +5,10 @@ from flask import jsonify, request
 from CTFd.utils import get_config
 from .models import ContainerChallengeModel, ContainerInfoModel, ContainerSettingsModel, ContainerFlagModel, ContainerCheatLog
 from .container_manager import ContainerManager, ContainerException
-from CTFd.models import db, Teams, Users, Solves
+from CTFd.models import db, Teams, Users, Solves, Challenges
 from CTFd.utils.user import get_current_user
-
+from CTFd.schemas.notifications import NotificationSchema
+from flask import current_app
 
 def get_settings_path():
     """Retrieve the path to settings.json"""
@@ -54,10 +55,15 @@ def kill_container(container_manager, container_id):
 def renew_container(container_manager, chal_id, xid, is_team):
     """Extend the expiration time of an active container"""
     challenge = ContainerChallengeModel.query.filter_by(id=chal_id).first()
-
+    expiration_setting = ContainerSettingsModel.query.filter_by(key='container_expiration').first()
+    if expiration_setting:
+        container_expiration = expiration_setting.value
+    else:
+        return jsonify({"error": "Container expiration setting not found"}), 500
+    
     if challenge is None:
         return jsonify({"error": "Challenge not found"}), 400
-
+    
     running_container = ContainerInfoModel.query.filter_by(
         challenge_id=challenge.id,
         team_id=xid if is_team else None,
@@ -82,6 +88,7 @@ def renew_container(container_manager, chal_id, xid, is_team):
             "hostname": container_manager.settings.get("docker_hostname", ""),
             "port": running_container.port,
             "connect": challenge.connection_type,
+            "container_expiration": container_expiration,
         }
     )
 
@@ -89,7 +96,12 @@ def renew_container(container_manager, chal_id, xid, is_team):
 def create_container(container_manager, chal_id, xid, is_team):
     """Create a new challenge container"""
     challenge = ContainerChallengeModel.query.filter_by(id=chal_id).first()
-
+    expiration_setting = ContainerSettingsModel.query.filter_by(key='container_expiration').first()
+    if expiration_setting:
+        container_expiration = expiration_setting.value
+    else:
+        return jsonify({"error": "Container expiration setting not found"}), 500
+    
     if challenge is None:
         return jsonify({"error": "Challenge not found"}), 400
 
@@ -132,8 +144,11 @@ def create_container(container_manager, chal_id, xid, is_team):
                             "docker_hostname", ""
                         ),
                         "port": running_container.port,
+                        "username": challenge.username,
+                        "password": challenge.password,
                         "connect": challenge.connection_type,
                         "expires": running_container.expires,
+                        "container_expiration": container_expiration
                     }
                 )
             else:
@@ -153,8 +168,11 @@ def create_container(container_manager, chal_id, xid, is_team):
             "status": "created",
             "hostname": container_manager.settings.get("docker_hostname", ""),
             "port": created_container["port"],
+            "username": challenge.username,
+            "password": challenge.password,
             "connect": challenge.connection_type,
             "expires": created_container["expires"],
+            "container_expiration": container_expiration
         }
     )
 
@@ -162,7 +180,12 @@ def create_container(container_manager, chal_id, xid, is_team):
 def view_container_info(container_manager, chal_id, xid, is_team):
     """Retrieve information about a running container"""
     challenge = ContainerChallengeModel.query.filter_by(id=chal_id).first()
-
+    expiration_setting = ContainerSettingsModel.query.filter_by(key='container_expiration').first()
+    if expiration_setting:
+        container_expiration = expiration_setting.value
+    else:
+        return jsonify({"error": "Container expiration setting not found"}), 500
+    
     if challenge is None:
         return jsonify({"error": "Challenge not found"}), 400
 
@@ -182,8 +205,11 @@ def view_container_info(container_manager, chal_id, xid, is_team):
                             "docker_hostname", ""
                         ),
                         "port": running_container.port,
+                        "username": challenge.username,
+                        "password": challenge.password,
                         "connect": challenge.connection_type,
                         "expires": running_container.expires,
+                        "container_expiration": container_expiration,
                     }
                 )
             else:
@@ -203,6 +229,7 @@ def connect_type(chal_id):
         return jsonify({"error": "Challenge not found"}), 400
 
     return jsonify({"status": "Ok", "connect": challenge.connection_type})
+
 
 def get_xid_and_flag():
     """
@@ -270,16 +297,27 @@ def get_container_flag(submitted_flag, user, container_manager, container_info, 
 
     return container_flag
 
+def get_fame_or_shame():
+    """
+    Fetches the 'fame_or_shame' setting value from the container settings.
+    Raises a ValueError if not found.
+    """
+    fame_or_shame = ContainerSettingsModel.query.filter_by(key="fame_or_shame").first()
+    
+    if fame_or_shame is None:
+        raise ValueError("Setting 'fame_or_shame' not found in ContainerSettingsModel")
+    return fame_or_shame.value
 
 
 def ban_team_and_original_owner(container_flag, user, container_manager, container_info):
     """
     If flag swapping or cheating is detected, ban both the original owner and the submitter.
-    Deletes the container record and kills the container.
+    Deletes the container record, kills the container, and sends notifications.
     """
     if not container_flag:
         raise ValueError("Cannot ban without a valid container flag.")
 
+    # Log the cheating incident
     cheat_log = ContainerCheatLog(
         reused_flag=container_flag.flag,
         challenge_id=container_flag.challenge_id,
@@ -292,11 +330,39 @@ def ban_team_and_original_owner(container_flag, user, container_manager, contain
     db.session.add(cheat_log)
     db.session.commit()
 
-    # Ban logic
+    fame_or_shame = get_fame_or_shame()
+
     if is_team_mode():
         original_team = Teams.query.filter_by(id=container_flag.team_id).first()
         submit_team = Teams.query.filter_by(id=user.team_id).first()
         
+        if fame_or_shame == '1':
+            challenge = Challenges.query.filter_by(id=container_flag.challenge_id).first()
+            if original_team and submit_team:
+                notification_title = "Cheating Detected!"
+                notification_content = (
+                    f"Flag swapping detected between {original_team.name} and {submit_team.name} "
+                    f"on challenge '{challenge.name}'. Both teams have been banned."
+                )
+                
+                notification_data = {
+                    "title": notification_title,
+                    "content": notification_content,
+                    "sound": True,
+                    "type": "toast"
+                }
+                
+                schema = NotificationSchema()
+                result = schema.load(notification_data)
+                if not result.errors:
+                    db.session.add(result.data)
+                    db.session.commit()
+                    
+                    response = schema.dump(result.data)
+                    response.data["type"] = "toast"
+                    response.data["sound"] = True
+                    current_app.events_manager.publish(data=response.data, type="notification")
+
         if original_team:
             original_team.banned = True
             for member in original_team.members:
@@ -305,6 +371,7 @@ def ban_team_and_original_owner(container_flag, user, container_manager, contain
             submit_team.banned = True
             for member in submit_team.members:
                 member.banned = True
+        
     else:
         if container_flag.user_id:
             original_user = Users.query.filter_by(id=container_flag.user_id).first()
@@ -313,14 +380,38 @@ def ban_team_and_original_owner(container_flag, user, container_manager, contain
 
         user.banned = True
 
+        if fame_or_shame == '1':
+            challenge = Challenges.query.filter_by(id=container_flag.challenge_id).first()
+            original_user = Users.query.filter_by(id=container_flag.user_id).first()
+            notification_title = "Cheating Detected!"
+            notification_content = (
+                f"Flag reuse detected between {original_user.name} and {user.name} "
+                f"on challenge '{challenge.name}'. Both users have been banned."
+            )
+            
+            notification_data = {
+                "title": notification_title,
+                "content": notification_content,
+                "sound": True,
+                "type": "toast"
+            }
+            
+            schema = NotificationSchema()
+            result = schema.load(notification_data)
+            if not result.errors:
+                db.session.add(result.data)
+                db.session.commit()
+                
+                response = schema.dump(result.data)
+                response.data["type"] = "toast"
+                response.data["sound"] = True
+                current_app.events_manager.publish(data=response.data, type="notification")
+
     db.session.commit()
 
-    # **If static mode, delete both flag and container info**
     if container_flag.challenge.flag_mode == "static":
         db.session.delete(container_flag)
         db.session.commit()
-
-    # **If random mode, only delete container info but keep the flag**
     elif container_flag.challenge.flag_mode == "random":
         db.session.query(ContainerFlagModel).filter_by(container_id=container_info.container_id).update({"container_id": None})
         db.session.commit()
@@ -333,9 +424,7 @@ def ban_team_and_original_owner(container_flag, user, container_manager, contain
 
     # Kill the container
     container_manager.kill_container(container_info.container_id)
-
-    # Kill the container
-    container_manager.kill_container(container_info.container_id)
+    
     raise ValueError("Cheating detected!")
 
 def get_current_user_or_team():

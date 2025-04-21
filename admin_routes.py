@@ -86,6 +86,7 @@ def route_update_settings():
         "container_maxmemory",
         "container_maxcpu",
         "max_containers",
+        "fame_or_shame"
     ]
 
     # Validate required fields

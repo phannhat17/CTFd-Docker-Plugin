@@ -58,18 +58,43 @@
 </div>
 
 <div class="form-group">
-	<label>
-		Connect type<br>
-		<small class="form-text text-muted">
-			Connect via web or tcp
-		</small>
-	</label>
-	<select type="text" class="form-control" name="connection_type" placeholder="Connect via" id="connect-type"
-		title="Connect via web or tcp" required>
-		<option value="" selected disabled>Choose a value...</option>
-		<option value="web">Web</option>
-		<option value="tcp">TCP</option>
-	</select>
+    <label>
+        Connect type<br>
+        <small class="form-text text-muted">
+            Connect via web or tcp or SSH
+        </small>
+    </label>
+    <select type="text" class="form-control" name="connection_type" placeholder="Connect via" id="connect-type"
+        title="Connect via web or tcp" required onchange="toggleSSHInputs()">
+        <option value="" selected disabled>Choose a value...</option>
+        <option value="web" {% if request.form.get('connection_type') == 'web' %}selected{% endif %}>Web</option>
+        <option value="tcp" {% if request.form.get('connection_type') == 'tcp' %}selected{% endif %}>TCP</option>
+        <option value="ssh" {% if request.form.get('connection_type') == 'ssh' %}selected{% endif %}>SSH</option>
+    </select>
+</div>
+
+<div class="form-group">
+    <label for="ssh-username">SSH Username<br>
+        <small class="form-text text-muted">
+            Enter SSH username when choosing SSH
+        </small>
+    </label>
+    <input type="text" class="form-control" name="username" placeholder="Enter SSH username"
+        id="ssh-username"
+        value="{{ request.form.get('username', '') }}"
+        {% if request.form.get('connection_type') != 'ssh' %}disabled{% endif %}>
+</div>
+
+<div class="form-group">
+    <label for="ssh-password">SSH Password<br>
+        <small class="form-text text-muted">
+            Enter SSH password when choosing SSH
+        </small>
+    </label>
+    <input type="text" class="form-control" name="password" placeholder="Enter SSH password"
+        id="ssh-password"
+        value="{{ request.form.get('password', '') }}"
+        {% if request.form.get('connection_type') != 'ssh' %}disabled{% endif %}>
 </div>
 
 <div class="form-group">
