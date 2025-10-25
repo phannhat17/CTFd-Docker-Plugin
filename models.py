@@ -24,8 +24,8 @@ class ContainerChallengeModel(Challenges):
     # Random flag properties
     flag_mode = db.Column(db.Text, default="static")
     random_flag_length = db.Column(db.Integer, default=10)
-    flag_prefix = db.Column(db.Text, default="CTF{")
-    flag_suffix = db.Column(db.Text, default="}")
+    flag_prefix = db.Column(db.Text, default="")
+    flag_suffix = db.Column(db.Text, default="")
 
     def __init__(self, *args, **kwargs):
         super(ContainerChallengeModel, self).__init__(**kwargs)
@@ -64,7 +64,7 @@ class ContainerFlagModel(db.Model):
     )
     container_id = db.Column(
         db.String(512),
-        db.ForeignKey("container_info_model.container_id", ondelete="CASCADE"),
+        db.ForeignKey("container_info_model.container_id"),
         nullable=True,
     )
     flag = db.Column(db.Text)
