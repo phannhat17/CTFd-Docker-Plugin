@@ -88,7 +88,7 @@ def route_stop_container():
             user_id=None if is_team_mode() else xid
         ).first()
 
-        if running_container:
+        if running_container and running_container.container_id:
             return kill_container(container_manager, running_container.container_id)
         return {"error": "No container found"}, 400
     except ValueError as err:
