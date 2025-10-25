@@ -101,10 +101,10 @@
 						<li>The flag follows a fixed format:
 							<code>&lt;prefix&gt; + &lt;flag content&gt; + &lt;suffix&gt;</code>
 						</li>
-						<li>Example: If your flag is <code>CTF{this_is_the_flag}</code>, you provide:
+						<li>Example: If your flag is <code>this_is_the_flag</code>, you provide:
 							<ul>
-								<li><strong>Prefix:</strong> <code>CTF{this_is_the_flag</code></li>
-								<li><strong>Suffix:</strong> <code>}</code></li>
+								<li><strong>Prefix:</strong> <code>this_is_the_flag</code></li>
+								<li><strong>Suffix:</strong> <code></code></li>
 								<li><strong>Random Length:</strong> Leave as default</li>
 							</ul>
 						</li>
@@ -115,10 +115,10 @@
 						<li>The flag follows the format:
 							<code>&lt;prefix&gt; + &lt;random part (length defined)&gt; + &lt;suffix&gt;</code>
 						</li>
-						<li>Example 1: If <code>random_length = 8</code>, a flag could be: <code>CTF{a1b2c3d4}</code>
+						<li>Example 1: If <code>random_length = 8</code>, a flag could be: <code>a1b2c3d4</code>
 						</li>
 						<li>Example 2: The random part can be appended to a predefined flag:
-							<code>CTF{this_is_the_flag_a1b2c3d4}</code>
+							<code>this_is_the_flag_a1b2c3d4</code>
 						</li>
 						<li>You provide:
 							<ul>
@@ -141,12 +141,12 @@
 
 <div class="form-group">
 	<label for="flag_prefix">Flag Prefix</label>
-	<input type="text" class="form-control" id="flag_prefix" name="flag_prefix" placeholder="CTF{" value="CTF{" />
+	<input type="text" class="form-control" id="flag_prefix" name="flag_prefix" placeholder="" value="" />
 </div>
 
 <div class="form-group">
 	<label for="flag_suffix">Flag Suffix</label>
-	<input type="text" class="form-control" id="flag_suffix" name="flag_suffix" placeholder="}" value="}" />
+	<input type="text" class="form-control" id="flag_suffix" name="flag_suffix" placeholder="" value="" />
 </div>
 
 <div class="form-group">
