@@ -11,7 +11,7 @@ import docker
 import paramiko.ssh_exception
 import requests
 
-from CTFd.models import db
+from CTFd.models import db, Flags
 from .models import ContainerInfoModel, ContainerFlagModel, ContainerFlagModel
 
 
@@ -170,11 +170,15 @@ class ContainerManager:
     def create_container(self, challenge, xid, is_team):
         kwargs = {}
 
-        flag = (
-            generate_random_flag(challenge)
-            if challenge.flag_mode == "random"
-            else challenge.flag_prefix + challenge.flag_suffix
-        )
+        if challenge.flag_mode == "random":
+            flag = generate_random_flag(challenge)
+        else:
+            # Get flag from flags table
+            flag_obj = Flags.query.filter_by(challenge_id=challenge.id).first()
+            if flag_obj:
+                flag = challenge.flag_prefix + flag_obj.content + challenge.flag_suffix
+            else:
+                flag = challenge.flag_prefix + challenge.flag_suffix
 
         # Set the memory and CPU limits for the container
         if self.settings.get("container_maxmemory"):
