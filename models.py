@@ -64,7 +64,7 @@ class ContainerFlagModel(db.Model):
     )
     container_id = db.Column(
         db.String(512),
-        db.ForeignKey("container_info_model.container_id"),
+        db.ForeignKey("container_info_model.container_id", ondelete="CASCADE"),
         nullable=True,
     )
     flag = db.Column(db.Text)
