@@ -143,6 +143,11 @@ class ContainerManager:
 
     @run_command
     def kill_expired_containers(self, app: Flask):
+        # Handle both scheduled and manual calls
+        if not isinstance(app, Flask):
+            from CTFd import create_app
+            app = create_app()
+
         with app.app_context():
             containers: "list[ContainerInfoModel]" = ContainerInfoModel.query.all()
 
