@@ -24,8 +24,8 @@ class ContainerChallengeModel(Challenges):
     # Random flag properties
     flag_mode = db.Column(db.Text, default="static")
     random_flag_length = db.Column(db.Integer, default=10)
-    flag_prefix = db.Column(db.Text, default="CTF{")
-    flag_suffix = db.Column(db.Text, default="}")
+    flag_prefix = db.Column(db.Text, default="")
+    flag_suffix = db.Column(db.Text, default="")
 
     def __init__(self, *args, **kwargs):
         super(ContainerChallengeModel, self).__init__(**kwargs)
