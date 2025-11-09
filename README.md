@@ -37,17 +37,18 @@ To use this plugin, you should have:
 
 ### Installation
 
-1. **Clone this repository:**
+1. **Clone page CTFd repository:**
    ```bash
-   git clone https://github.com/phannhat17/CTFd-Docker-Plugin.git
+   git clone https://github.com/CTFd/CTFd.git
+   cd CTFd/
    ```
-2. **Rename the folder:**
+2. **Add this repo as a submodule plugin:**
    ```bash
-   mv CTFd-Docker-Plugin containers
+   git submodule add git@github.com:phannhat17/CTFd-Docker-Plugin.git CTFd/plugins/containers
    ```
-3. **Move the folder to the CTFd plugins directory:**
+3. **Update Python requirements:**
    ```bash
-   mv containers /path/to/CTFd/plugins/
+   cat CTFd/plugins/containers/requirements.txt >> requirements.in
    ```
 
 [Back to top](#ctfd-docker-containers-plugin)
