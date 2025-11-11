@@ -16,6 +16,10 @@ class ContainerChallengeModel(Challenges):
     volumes = db.Column(db.Text, default="")
     connection_type = db.Column(db.Text)
 
+    # SSH connection properties
+    ssh_username = db.Column(db.Text, nullable=True)
+    ssh_password = db.Column(db.Text, nullable=True)
+
     # Dynamic challenge properties
     initial = db.Column(db.Integer, default=0)
     minimum = db.Column(db.Integer, default=0)
@@ -39,10 +43,12 @@ class ContainerInfoModel(db.Model):
     team_id = db.Column(db.Integer, db.ForeignKey("teams.id", ondelete="CASCADE"), index=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), index=True)
     port = db.Column(db.Integer)
+    ssh_username = db.Column(db.Text, nullable=True)
+    ssh_password = db.Column(db.Text, nullable=True)
     timestamp = db.Column(db.Integer)
     expires = db.Column(db.Integer)
     flag = db.Column(db.Text, default="")
-    
+
     team = relationship("Teams", foreign_keys=[team_id])
     user = relationship("Users", foreign_keys=[user_id])
 

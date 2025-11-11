@@ -70,15 +70,36 @@
 	<label>
 		Connect type<br>
 		<small class="form-text text-muted">
-			Connect via web or tcp
+			Connect via web, tcp, or ssh
 		</small>
 	</label>
 	<select type="text" class="form-control" name="connection_type" placeholder="Connect via" id="connect-type"
-		title="Connect via web or tcp" required>
+		title="Connect via web, tcp, or ssh" required>
 		<option value="" id="connect-type-default" selected disabled>Choose a value...</option>
 		<option value="web">Web</option>
 		<option value="tcp">TCP</option>
+		<option value="ssh">SSH</option>
 	</select>
+</div>
+
+<div class="form-group">
+	<label>
+		SSH Username<br>
+		<small class="form-text text-muted">
+			Username for SSH connection (only used if connection type is SSH)
+		</small>
+	</label>
+	<input type="text" class="form-control" name="ssh_username" value="{{ challenge.ssh_username }}" placeholder="Enter username or leave blank">
+</div>
+
+<div class="form-group">
+	<label>
+		SSH Password<br>
+		<small class="form-text text-muted">
+			Password for SSH connection (only used if connection type is SSH). Leave blank for key-based authentication.
+		</small>
+	</label>
+	<input type="password" class="form-control" name="ssh_password" value="{{ challenge.ssh_password }}" placeholder="Enter password or leave blank">
 </div>
 
 <div class="form-group">
