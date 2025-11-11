@@ -82,6 +82,8 @@ def renew_container(container_manager, chal_id, xid, is_team):
             "hostname": container_manager.settings.get("docker_hostname", ""),
             "port": running_container.port,
             "connect": challenge.connection_type,
+            "ssh_username": running_container.ssh_username,
+            "ssh_password": running_container.ssh_password,
         }
     )
 
@@ -134,6 +136,8 @@ def create_container(container_manager, chal_id, xid, is_team):
                         "port": running_container.port,
                         "connect": challenge.connection_type,
                         "expires": running_container.expires,
+                        "ssh_username": running_container.ssh_username,
+                        "ssh_password": running_container.ssh_password,
                     }
                 )
             else:
@@ -155,6 +159,8 @@ def create_container(container_manager, chal_id, xid, is_team):
             "port": created_container["port"],
             "connect": challenge.connection_type,
             "expires": created_container["expires"],
+            "ssh_username": created_container["ssh_username"],
+            "ssh_password": created_container["ssh_password"],
         }
     )
 
@@ -184,6 +190,8 @@ def view_container_info(container_manager, chal_id, xid, is_team):
                         "port": running_container.port,
                         "connect": challenge.connection_type,
                         "expires": running_container.expires,
+                        "ssh_username": running_container.ssh_username,
+                        "ssh_password": running_container.ssh_password,
                     }
                 )
             else:

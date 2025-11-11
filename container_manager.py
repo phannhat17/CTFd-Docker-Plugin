@@ -235,6 +235,8 @@ class ContainerManager:
                 team_id=xid if is_team else None,
                 user_id=None if is_team else xid,
                 port=port,
+                ssh_username=challenge.ssh_username,
+                ssh_password=challenge.ssh_password,
                 flag=flag,
                 timestamp=int(time.time()),
                 expires=expires,
@@ -253,7 +255,13 @@ class ContainerManager:
             db.session.add(new_flag_entry)
             db.session.commit()
 
-            return {"container": container, "expires": expires, "port": port}
+            return {
+                "container": container,
+                "expires": expires,
+                "port": port,
+                "ssh_username": challenge.ssh_username,
+                "ssh_password": challenge.ssh_password,
+            }
         except docker.errors.ImageNotFound:
             raise ContainerException("Docker image not found")
 

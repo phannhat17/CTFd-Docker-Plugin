@@ -80,6 +80,15 @@ function createChallengeLinkElement(data, parent) {
         let codeElement = document.createElement('code');
         codeElement.textContent = 'nc ' + data.hostname + " " + data.port;
         parent.append(codeElement);
+    } else if (data.connect == "ssh") {
+        let codeElement = document.createElement('code');
+        // Support both password-based and key-based SSH authentication
+        if (data.ssh_password == null) {
+            codeElement.textContent = 'ssh -o StrictHostKeyChecking=no ' + data.ssh_username + '@' + data.hostname + " -p" + data.port;
+        } else {
+            codeElement.textContent = 'sshpass -p' + data.ssh_password + " ssh -o StrictHostKeyChecking=no " + data.ssh_username + '@' + data.hostname + " -p" + data.port;
+        }
+        parent.append(codeElement);
     } else {
         let link = document.createElement('a');
         link.href = 'http://' + data.hostname + ":" + data.port;
