@@ -73,6 +73,26 @@
 	</select>
 </div>
 
+<div class="form-group ssh-fields" id="ssh-username-group" style="display: none;">
+	<label>
+		SSH Username<br>
+		<small class="form-text text-muted">
+			Username for SSH connection (required for SSH challenges)
+		</small>
+	</label>
+	<input type="text" class="form-control" name="ssh_username" id="ssh-username-input" placeholder="Enter username">
+</div>
+
+<div class="form-group ssh-fields" id="ssh-password-group" style="display: none;">
+	<label>
+		SSH Password<br>
+		<small class="form-text text-muted">
+			Password for SSH connection. Leave blank for key-based authentication.
+		</small>
+	</label>
+	<input type="password" class="form-control" name="ssh_password" placeholder="Enter password or leave blank">
+</div>
+
 <div class="form-group">
 	<label>
 		SSH Username<br>
@@ -174,6 +194,34 @@
 	<label for="random_flag_length">Random Flag Length (Leave as default at static mode)</label>
 	<input type="number" class="form-control" id="random_flag_length" name="random_flag_length" min="1" value="10" />
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+	const connectTypeSelect = document.getElementById('connect-type');
+	const sshUsernameGroup = document.getElementById('ssh-username-group');
+	const sshPasswordGroup = document.getElementById('ssh-password-group');
+	const sshUsernameInput = document.getElementById('ssh-username-input');
+
+	function toggleSSHFields() {
+		const connectionType = connectTypeSelect.value;
+		if (connectionType === 'ssh') {
+			sshUsernameGroup.style.display = 'block';
+			sshPasswordGroup.style.display = 'block';
+			sshUsernameInput.setAttribute('required', 'required');
+		} else {
+			sshUsernameGroup.style.display = 'none';
+			sshPasswordGroup.style.display = 'none';
+			sshUsernameInput.removeAttribute('required');
+		}
+	}
+
+	// Set initial state
+	toggleSSHFields();
+
+	// Add change listener
+	connectTypeSelect.addEventListener('change', toggleSSHFields);
+});
+</script>
 
 {% endblock %}
 

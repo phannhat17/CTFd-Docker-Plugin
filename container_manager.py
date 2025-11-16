@@ -292,7 +292,9 @@ class ContainerManager:
     @run_command
     def kill_container(self, container_id: str):
         try:
-            self.client.containers.get(container_id).kill()
+            container = self.client.containers.get(container_id)
+            container.kill()
+            container.remove()
 
             container_info = ContainerInfoModel.query.filter_by(
                 container_id=container_id
