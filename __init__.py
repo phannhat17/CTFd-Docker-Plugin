@@ -45,6 +45,8 @@ class ContainerChallenge(BaseChallenge):
             "port": challenge.port,
             "command": challenge.command,
             "connection_type": challenge.connection_type,
+            "ssh_username": challenge.ssh_username,
+            "ssh_password": challenge.ssh_password,
             "initial": challenge.initial,
             "decay": challenge.decay,
             "minimum": challenge.minimum,
