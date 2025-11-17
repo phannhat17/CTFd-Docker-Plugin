@@ -1,0 +1,11 @@
+{
+  "challenge_name": "My Docker Challenge",
+  "challenge_author": "Your Name",
+  "challenge_category": "Pwn",
+  "challenge_description": "A brief description of your challenge",
+  "docker_image_name": "challenge",
+  "docker_port": "1337",
+  "connection_type": "tcp",
+  "initial_points": "100",
+  "flag": "flag{example_flag_replace_me}"
+}

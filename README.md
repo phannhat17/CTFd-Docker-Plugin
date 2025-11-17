@@ -14,10 +14,14 @@
 2. [Usage](#usage)
    - [Using Local Docker Daemon](#using-local-docker-daemon)
    - [Using Remote Docker via SSH](#using-remote-docker-via-ssh)
-3. [Demo](#demo)
-4. [Roadmap](#roadmap)
-5. [License](#license)
-6. [Contact](#contact)
+3. [ctfcli Integration](#ctfcli-integration)
+   - [Creating Challenges with ctfcli](#creating-challenges-with-ctfcli)
+   - [Challenge Template Structure](#challenge-template-structure)
+   - [Deploying Challenges](#deploying-challenges)
+4. [Demo](#demo)
+5. [Roadmap](#roadmap)
+6. [License](#license)
+7. [Contact](#contact)
 
 ---
 
@@ -130,6 +134,211 @@ For remote Docker, the CTFd host must have SSH access to the remote server.
    ```bash
    sudo systemctl restart ctfd
    ```
+
+[Back to top](#ctfd-docker-containers-plugin)
+
+---
+
+## ctfcli Integration
+
+This plugin now supports [ctfcli](https://github.com/CTFd/ctfcli), the official command-line tool for managing CTFd challenges. With ctfcli integration, you can:
+
+- Create Docker challenges from templates
+- Manage challenge configuration with YAML files
+- Deploy challenges to CTFd via the command line
+- Version control your challenges with Git
+
+### Creating Challenges with ctfcli
+
+#### 1. Install ctfcli
+
+```bash
+pip install ctfcli
+```
+
+#### 2. Initialize your CTF project
+
+```bash
+ctf init
+# Follow the prompts to configure your CTFd instance
+```
+
+#### 3. Create a new Docker challenge
+
+Using the included template:
+
+```bash
+# Method 1: Copy the template manually
+cp -r /path/to/CTFd-Docker-Plugin/ctfcli-template/docker/default ./challenges/my-challenge
+cd challenges/my-challenge
+
+# Method 2: Use ctfcli with custom template path (if supported)
+ctf challenge add --templates /path/to/CTFd-Docker-Plugin/ctfcli-template
+ctf challenge new docker
+```
+
+#### 4. Customize your challenge
+
+Edit the `challenge.yml` file:
+
+```yaml
+name: "My Docker Challenge"
+author: "Your Name"
+category: "Pwn"
+description: "Challenge description here"
+type: container  # REQUIRED: Must be "container" for this plugin
+
+extra:
+  # Docker configuration
+  image: "your-dockerhub-username/challenge-name:latest"
+  port: 1337
+  connection_type: "tcp"  # Options: tcp, http, https, ssh
+
+  # Optional: Dynamic scoring
+  initial: 500
+  minimum: 100
+  decay: 75
+
+  # Optional: Dynamic flags
+  flag_mode: "random"
+  random_flag_length: 32
+```
+
+#### 5. Build your Docker image
+
+```bash
+# Use the provided build script
+./build.sh
+
+# Or build manually
+docker build -t your-username/challenge-name:latest .
+docker push your-username/challenge-name:latest
+```
+
+#### 6. Deploy to CTFd
+
+```bash
+# Install the challenge
+ctf challenge install
+
+# Or sync if already installed
+ctf challenge sync
+```
+
+### Challenge Template Structure
+
+The ctfcli template is located in `ctfcli-template/docker/default/` and includes:
+
+```
+docker/default/
+├── challenge.yml       # Challenge configuration (REQUIRED)
+├── Dockerfile          # Docker image definition
+├── build.sh           # Build script
+├── flag.txt           # Flag file
+├── src/               # Source code
+│   └── challenge.c    # Example challenge
+├── dist/              # Distributable files
+├── solution/          # Solution scripts
+│   └── exploit.py     # Example exploit
+└── README.md          # Template documentation
+```
+
+### Challenge Configuration Options
+
+#### Required Fields
+
+- `name`: Challenge name
+- `type`: Must be `container`
+- `extra.image`: Docker image name
+- `extra.port`: Container port to expose
+- `extra.connection_type`: Connection type (`tcp`, `http`, `https`, `ssh`)
+
+#### Optional Fields
+
+- `extra.command`: Override container CMD
+- `extra.volumes`: Volume mounts (comma-separated)
+- `extra.ssh_username`: SSH username (if using SSH)
+- `extra.ssh_password`: SSH password (if using SSH)
+- `extra.initial`: Initial points (dynamic scoring)
+- `extra.minimum`: Minimum points (dynamic scoring)
+- `extra.decay`: Decay rate (dynamic scoring)
+- `extra.flag_mode`: Flag generation mode (`static` or `random`)
+- `extra.random_flag_length`: Length of random flags
+- `extra.flag_prefix`: Prefix for generated flags
+- `extra.flag_suffix`: Suffix for generated flags
+
+### Connection Types
+
+#### TCP (for pwn challenges)
+```yaml
+extra:
+  port: 1337
+  connection_type: "tcp"
+```
+Players connect with: `nc <host> <port>`
+
+#### HTTP/HTTPS (for web challenges)
+```yaml
+extra:
+  port: 80
+  connection_type: "http"
+```
+Players access via: `http://<host>:<port>`
+
+#### SSH (for SSH challenges)
+```yaml
+extra:
+  port: 22
+  connection_type: "ssh"
+  ssh_username: "ctfplayer"
+  ssh_password: "password123"
+```
+Players connect with: `ssh ctfplayer@<host> -p <port>`
+
+### Deploying Challenges
+
+```bash
+# Install a single challenge
+cd challenges/my-challenge
+ctf challenge install
+
+# Install all challenges
+ctf challenge install --all
+
+# Sync changes to an existing challenge
+ctf challenge sync
+
+# Verify challenge status
+ctf challenge verify
+```
+
+### Example Workflow
+
+```bash
+# 1. Create challenge from template
+cp -r ctfcli-template/docker/default ./challenges/buffer-overflow
+cd challenges/buffer-overflow
+
+# 2. Customize the challenge
+vim src/challenge.c
+vim challenge.yml
+
+# 3. Build the Docker image
+./build.sh
+
+# 4. Test locally
+docker run -p 1337:1337 buffer-overflow:latest
+nc localhost 1337
+
+# 5. Deploy to CTFd
+ctf challenge install
+
+# 6. Update and sync
+vim challenge.yml
+ctf challenge sync
+```
+
+For more detailed information, see the [template README](ctfcli-template/docker/default/README.md).
 
 [Back to top](#ctfd-docker-containers-plugin)
 

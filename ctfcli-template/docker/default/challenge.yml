@@ -1,0 +1,117 @@
+# CTFd Docker Container Challenge Template
+# This template is designed for use with the CTFd-Docker-Plugin
+# For more information, see: https://github.com/phannhat17/CTFd-Docker-Plugin
+
+# Basic Challenge Information
+name: "Example Docker Challenge"
+author: "Your Name"
+category: "Pwn"
+description: |
+  This is an example Docker container challenge.
+
+  Players will receive a unique container instance when they start the challenge.
+
+  Connect to your container using the connection information provided.
+
+# Challenge Type - MUST be "container" for this plugin
+type: container
+
+# Point Value (or initial value for dynamic scoring)
+value: 100
+
+# Challenge Version (for ctfcli tracking)
+version: "1.0"
+
+# Docker Container Configuration
+# These fields go into the "extra" section for the container plugin
+extra:
+  # === REQUIRED FIELDS ===
+
+  # Docker image to deploy (must be available on the Docker host)
+  # You can use a pre-built image from Docker Hub or build your own
+  image: "your-dockerhub-username/challenge-image:latest"
+
+  # Port exposed by the container
+  # This is the internal port that your service listens on
+  port: 1337
+
+  # Connection type: "http", "https", "tcp", or "ssh"
+  connection_type: "tcp"
+
+  # === OPTIONAL FIELDS ===
+
+  # Command to run in the container (overrides Dockerfile CMD)
+  # Leave empty to use the default CMD from the Dockerfile
+  command: ""
+
+  # Volume mounts (comma-separated)
+  # Format: "host_path:container_path,host_path2:container_path2"
+  # Usually not needed for CTF challenges
+  volumes: ""
+
+  # === SSH CONNECTION (only if connection_type is "ssh") ===
+  # Uncomment these if using SSH connections
+  # ssh_username: "ctfplayer"
+  # ssh_password: "changeme"
+
+  # === DYNAMIC SCORING ===
+  # Uncomment these to enable dynamic scoring
+  # Points decrease as more teams solve the challenge
+  # initial: 500    # Starting point value
+  # minimum: 100    # Minimum point value
+  # decay: 75       # Rate of decay (higher = slower decay)
+
+  # === DYNAMIC FLAG GENERATION ===
+  # The plugin supports per-user/per-team flag generation
+  # flag_mode: "static"    # Options: "static" or "random"
+  # random_flag_length: 32 # Length of random flag (if using random mode)
+  # flag_prefix: "flag{"   # Prefix for the flag
+  # flag_suffix: "}"       # Suffix for the flag
+
+# Flags
+# For static flags, define them here
+# For dynamic (per-user) flags, the plugin will generate them automatically
+flags:
+  - flag{this_is_an_example_flag}
+  - type: static
+    content: flag{alternative_flag_format}
+    data: case_insensitive
+
+# Files to include with the challenge
+# These will be available for download by players
+files:
+  - dist/challenge_binary
+  # Add more files as needed
+
+# Hints (optional)
+hints:
+  - content: "Try connecting to the service and examining the responses"
+    cost: 0
+  - content: "Look for buffer overflow vulnerabilities"
+    cost: 50
+
+# Tags (optional, for organization)
+tags:
+  - pwn
+  - buffer-overflow
+  - docker
+
+# Topics (optional, for organization)
+topics:
+  - Binary Exploitation
+  - Memory Corruption
+
+# Challenge Requirements (optional)
+# List challenge names that must be solved first
+requirements: []
+
+# Challenge State
+# Options: "hidden", "visible"
+state: hidden
+
+# Attempt Limit (0 = unlimited)
+# Set to limit the number of solve attempts
+attempts: 0
+
+# Specification version
+version: "0.1"
