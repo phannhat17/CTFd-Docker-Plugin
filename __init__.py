@@ -1,212 +1,334 @@
-from __future__ import division
+"""
+CTFd Docker Plugin - Multi-Port Support Implementation
 
-import time
-import json
-import datetime
-import math
+This module provides multi-port container support for CTFd challenges.
+It extends the base Docker plugin to handle multiple port mappings and
+connection types (http, https, tcp, ssh).
 
-from flask import Blueprint, request, Flask, render_template, url_for, redirect, flash
+Author: Loot The Crab Team
+Version: 2.0.0
+"""
 
-from CTFd.models import db, Solves, Teams, Users
+import docker
+from flask import Blueprint
 from CTFd.plugins import register_plugin_assets_directory
 from CTFd.plugins.challenges import CHALLENGE_CLASSES, BaseChallenge
-from CTFd.utils.modes import get_model
-from .models import ContainerChallengeModel, ContainerInfoModel, ContainerSettingsModel, ContainerFlagModel, ContainerCheatLog  
-from .container_manager import ContainerManager, ContainerException
-from .admin_routes import admin_bp, set_container_manager as set_admin_manager
-from .user_routes import containers_bp, set_container_manager as set_user_manager
-from .helpers import *
-from CTFd.utils.user import get_current_user
+from CTFd.models import db, Challenges, Solves, Fails, Flags, Tags, Hints
 
-settings = json.load(open(get_settings_path()))
 
-class ContainerChallenge(BaseChallenge):
-    id = settings["plugin-info"]["id"]
-    name = settings["plugin-info"]["name"]
-    templates = settings["plugin-info"]["templates"]
-    scripts = settings["plugin-info"]["scripts"]
-    route = settings["plugin-info"]["base_path"]
+class DockerChallengeType(BaseChallenge):
+    """
+    Docker challenge type with multi-port support
+    """
+    id = "docker"
+    name = "docker"
+    templates = {
+        "create": "/plugins/docker_plugin/assets/create.html",
+        "update": "/plugins/docker_plugin/assets/update.html",
+        "view": "/plugins/docker_plugin/assets/view.html",
+    }
+    scripts = {
+        "create": "/plugins/docker_plugin/assets/create.js",
+        "update": "/plugins/docker_plugin/assets/update.js",
+        "view": "/plugins/docker_plugin/assets/view.js",
+    }
 
-    challenge_model = ContainerChallengeModel
 
-    @classmethod
-    def read(cls, challenge):
+class DockerContainerManager:
+    """Manages Docker containers for challenges with multi-port support"""
+
+    def __init__(self):
+        self.client = docker.from_env()
+
+    def parse_port_config(self, challenge_data):
         """
-        This method is in used to access the data of a challenge in a format processable by the front end.
+        Parse port configuration from challenge data.
+        Supports both old single-port format and new multi-port format.
 
-        :param challenge:
-        :return: Challenge object, data dictionary to be returned to the user
+        Args:
+            challenge_data: Dictionary containing challenge configuration
+
+        Returns:
+            List of port configurations
         """
-        data = {
-            "id": challenge.id,
-            "name": challenge.name,
-            "value": challenge.value,
-            "image": challenge.image,
-            "port": challenge.port,
-            "command": challenge.command,
-            "connection_type": challenge.connection_type,
-            "ssh_username": challenge.ssh_username,
-            "ssh_password": challenge.ssh_password,
-            "initial": challenge.initial,
-            "decay": challenge.decay,
-            "minimum": challenge.minimum,
-            "description": challenge.description,
-            "connection_info": challenge.connection_info,
-            "category": challenge.category,
-            "state": challenge.state,
-            "max_attempts": challenge.max_attempts,
-            "type": challenge.type,
-            "type_data": {
-                "id": cls.id,
-                "name": cls.name,
-                "templates": cls.templates,
-                "scripts": cls.scripts,
-            },
-        }
-        return data
+        ports = []
 
-    @classmethod
-    def calculate_value(cls, challenge):
-        Model = get_model()
+        # Check for new multi-port format
+        if 'ports' in challenge_data and challenge_data['ports']:
+            # New format - array of port configs
+            ports = challenge_data['ports']
 
-        solve_count = (
-            Solves.query.join(Model, Solves.account_id == Model.id)
-            .filter(
-                Solves.challenge_id == challenge.id,
-                Model.hidden == False,
-                Model.banned == False,
+        # Check for old single-port format (backward compatibility)
+        elif 'port' in challenge_data and 'protocol' in challenge_data:
+            # Convert old format to new format
+            ports = [{
+                'port': int(challenge_data.get('port', 80)),
+                'protocol': challenge_data.get('protocol', 'tcp'),
+                'name': challenge_data.get('protocol', 'tcp').upper(),
+                'connection_info': challenge_data.get('connection_info', ''),
+                'primary': True
+            }]
+
+        return ports
+
+    def create_port_bindings(self, port_configs):
+        """
+        Create Docker port bindings from port configurations.
+
+        Args:
+            port_configs: List of port configuration dictionaries
+
+        Returns:
+            Tuple of (exposed_ports, port_bindings) for Docker API
+        """
+        exposed_ports = {}
+        port_bindings = {}
+
+        for port_config in port_configs:
+            internal_port = port_config['port']
+            port_key = f"{internal_port}/tcp"
+
+            # Expose the port
+            exposed_ports[port_key] = {}
+
+            # Let Docker assign random external port
+            port_bindings[port_key] = None
+
+        return exposed_ports, port_bindings
+
+    def create_container(self, challenge_id, user_id, challenge_data):
+        """
+        Create a Docker container for a challenge with multi-port support.
+
+        Args:
+            challenge_id: ID of the challenge
+            user_id: ID of the user
+            challenge_data: Dictionary containing challenge configuration
+
+        Returns:
+            Docker container object
+        """
+        # Parse port configuration
+        port_configs = self.parse_port_config(challenge_data)
+
+        if not port_configs:
+            raise ValueError("No port configuration found in challenge data")
+
+        # Create port bindings
+        exposed_ports, port_bindings = self.create_port_bindings(port_configs)
+
+        # Get image name
+        image_name = challenge_data.get('image', 'ubuntu:latest')
+
+        # Container name
+        container_name = f"ctfd_challenge_{challenge_id}_user_{user_id}"
+
+        # Create and start container
+        try:
+            container = self.client.containers.run(
+                image=image_name,
+                detach=True,
+                ports=port_bindings,
+                name=container_name,
+                remove=False,
+                network_mode='bridge',
+                # Add resource limits
+                mem_limit='512m',
+                cpu_quota=50000,
+                # Store challenge metadata
+                labels={
+                    'ctfd.challenge_id': str(challenge_id),
+                    'ctfd.user_id': str(user_id),
+                    'ctfd.port_count': str(len(port_configs))
+                }
             )
-            .count()
-        )
+            return container
 
-        # If the solve count is 0 we shouldn't manipulate the solve count to
-        # let the math update back to normal
-        if solve_count != 0:
-            # We subtract -1 to allow the first solver to get max point value
-            solve_count -= 1
+        except docker.errors.APIError as e:
+            raise Exception(f"Failed to create container: {str(e)}")
 
-        # It is important that this calculation takes into account floats.
-        # Hence this file uses from __future__ import division
-        value = (
-            ((challenge.minimum - challenge.initial) / (challenge.decay**2))
-            * (solve_count**2)
-        ) + challenge.initial
-
-        value = math.ceil(value)
-
-        if value < challenge.minimum:
-            value = challenge.minimum
-
-        challenge.value = value
-        db.session.commit()
-        return challenge
-
-    @classmethod
-    def update(cls, challenge, request):
+    def get_container(self, challenge_id, user_id):
         """
-        This method is used to update the information associated with a challenge. This should be kept strictly to the
-        Challenges table and any child tables.
-        :param challenge:
-        :param request:
-        :return:
+        Get existing container for a user's challenge instance.
+
+        Args:
+            challenge_id: ID of the challenge
+            user_id: ID of the user
+
+        Returns:
+            Docker container object or None
         """
-        data = request.form or request.get_json()
+        container_name = f"ctfd_challenge_{challenge_id}_user_{user_id}"
 
-        for attr, value in data.items():
-            # We need to set these to floats so that the next operations don't operate on strings
-            if attr in ("initial", "minimum", "decay"):
-                value = float(value)
-            setattr(challenge, attr, value)
-
-        return ContainerChallenge.calculate_value(challenge)
-
-    @classmethod
-    def solve(cls, user, team, challenge, request):
-        super().solve(user, team, challenge, request)
-
-        cls.calculate_value(challenge)
-
-    @classmethod
-    def attempt(cls, challenge, request):
-        # 1) Gather user/team & submitted_flag
         try:
-            user, x_id, submitted_flag = get_xid_and_flag()
-        except ValueError as e:
-            return False, str(e)
+            container = self.client.containers.get(container_name)
+            return container
+        except docker.errors.NotFound:
+            return None
 
-        # 2) Get running container
-        container_info = None
-        try:
-            container_info = get_active_container(challenge.id, x_id)
-        except ValueError as e:
-            return False, str(e)
+    def stop_container(self, challenge_id, user_id):
+        """
+        Stop and remove a container.
 
-        # 3) Check if container is actually running
-        from . import container_manager
-        if not container_manager or not container_manager.is_container_running(container_info.container_id):
-            return False, "Your container is not running; you cannot submit yet."
+        Args:
+            challenge_id: ID of the challenge
+            user_id: ID of the user
 
-        # Validate the flag belongs to the user/team
-        try:
-            container_flag = get_container_flag(submitted_flag, user, container_manager, container_info, challenge)
-        except ValueError as e:
-            return False, str(e)  # Return incorrect flag message if not cheating
+        Returns:
+            Boolean indicating success
+        """
+        container = self.get_container(challenge_id, user_id)
 
-        # 6) Mark used & kill container => success
-        container_flag.used = True
-        db.session.commit()
-
-        # **If the challenge is static, delete both flag and container records**
-        if challenge.flag_mode == "static":
-            db.session.delete(container_flag)
-            db.session.commit()
-        
-        # **If the challenge is random, keep the flag but delete only the container info**
-        if challenge.flag_mode == "random":
-            db.session.query(ContainerFlagModel).filter_by(container_id=container_info.container_id).update({"container_id": None})
-            db.session.commit()
-
-        # Remove container info record
-        container = ContainerInfoModel.query.filter_by(container_id=container_info.container_id).first()
         if container:
-            db.session.delete(container)
-            db.session.commit()
+            try:
+                container.stop(timeout=10)
+                container.remove()
+                return True
+            except docker.errors.APIError:
+                return False
 
-        # Kill the container
-        container_manager.kill_container(container_info.container_id)
+        return False
 
-        return True, "Correct"
+    def get_connection_info(self, container, port_configs, hostname=None):
+        """
+        Generate connection information for all exposed ports.
 
-container_manager = None  # Global
+        Args:
+            container: Docker container object
+            port_configs: List of port configurations
+            hostname: Optional hostname override (defaults to localhost)
 
-def load(app: Flask):
-    # Ensure database is initialized
-    app.db.create_all()
+        Returns:
+            List of connection information dictionaries
+        """
+        if hostname is None:
+            hostname = 'localhost'  # Should be configured from settings
 
-    # Register the challenge type
-    CHALLENGE_CLASSES["container"] = ContainerChallenge
+        # Reload container to get current port mappings
+        container.reload()
+        port_mappings = container.attrs['NetworkSettings']['Ports']
 
+        connections = []
+
+        for port_config in port_configs:
+            internal_port = port_config['port']
+            protocol = port_config.get('protocol', 'tcp')
+            name = port_config.get('name', protocol.upper())
+            template = port_config.get('connection_info', '')
+            is_primary = port_config.get('primary', False)
+
+            # Get external port mapping
+            port_key = f"{internal_port}/tcp"
+
+            if port_key in port_mappings and port_mappings[port_key]:
+                external_port = port_mappings[port_key][0]['HostPort']
+
+                # Replace placeholders in connection template
+                connection_string = template.replace('{{HOSTNAME}}', hostname)
+                connection_string = connection_string.replace('{{PORT}}', external_port)
+                connection_string = connection_string.replace('{{SERVICE_NAME}}', name)
+
+                connections.append({
+                    'name': name,
+                    'protocol': protocol,
+                    'connection': connection_string,
+                    'primary': is_primary,
+                    'internal_port': internal_port,
+                    'external_port': external_port
+                })
+
+        # Sort connections to put primary first
+        connections.sort(key=lambda x: (not x['primary'], x['internal_port']))
+
+        return connections
+
+
+# Global container manager instance
+container_manager = DockerContainerManager()
+
+
+def load(app):
+    """
+    Plugin entry point - called when CTFd loads the plugin.
+
+    Args:
+        app: Flask application instance
+    """
+    # Register challenge type
+    CHALLENGE_CLASSES["docker"] = DockerChallengeType
+
+    # Register plugin assets
     register_plugin_assets_directory(
-        app, base_path=settings["plugin-info"]["base_path"]
+        app, base_path="/plugins/docker_plugin/assets/"
     )
 
-    global container_manager
-    container_settings = settings_to_dict(ContainerSettingsModel.query.all())
-    container_manager = ContainerManager(container_settings, app)
-
-    base_bp = Blueprint(
-        "containers",
+    # Register blueprints for API endpoints
+    docker_bp = Blueprint(
+        "docker_plugin",
         __name__,
-        template_folder=settings["blueprint"]["template_folder"],
-        static_folder=settings["blueprint"]["static_folder"]
+        template_folder="templates",
+        static_folder="assets",
+        url_prefix="/docker"
     )
 
-    set_admin_manager(container_manager)
-    set_user_manager(container_manager)
+    @docker_bp.route("/start/<int:challenge_id>", methods=["POST"])
+    def start_container(challenge_id):
+        """API endpoint to start a container"""
+        from flask import jsonify, request
+        from CTFd.utils.user import get_current_user
 
-    # Register the blueprints
-    app.register_blueprint(admin_bp)  # Admin APIs
-    app.register_blueprint(containers_bp) # User APIs
+        user = get_current_user()
+        if not user:
+            return jsonify({"success": False, "message": "Not authenticated"}), 401
 
+        # Get challenge data
+        challenge = Challenges.query.filter_by(id=challenge_id).first()
+        if not challenge:
+            return jsonify({"success": False, "message": "Challenge not found"}), 404
 
-    app.register_blueprint(base_bp)
+        challenge_data = challenge.extra  # Assuming extra field contains config
+
+        try:
+            # Create container
+            container = container_manager.create_container(
+                challenge_id,
+                user.id,
+                challenge_data
+            )
+
+            # Get port configs
+            port_configs = container_manager.parse_port_config(challenge_data)
+
+            # Get connection info
+            connections = container_manager.get_connection_info(
+                container,
+                port_configs,
+                hostname=request.host.split(':')[0]
+            )
+
+            return jsonify({
+                "success": True,
+                "container_id": container.id[:12],
+                "connections": connections
+            })
+
+        except Exception as e:
+            return jsonify({"success": False, "message": str(e)}), 500
+
+    @docker_bp.route("/stop/<int:challenge_id>", methods=["POST"])
+    def stop_container_endpoint(challenge_id):
+        """API endpoint to stop a container"""
+        from flask import jsonify
+        from CTFd.utils.user import get_current_user
+
+        user = get_current_user()
+        if not user:
+            return jsonify({"success": False, "message": "Not authenticated"}), 401
+
+        success = container_manager.stop_container(challenge_id, user.id)
+
+        return jsonify({"success": success})
+
+    app.register_blueprint(docker_bp)
+
+    print(" * CTFd Docker Plugin loaded with multi-port support")

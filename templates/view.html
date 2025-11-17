@@ -1,0 +1,307 @@
+{% extends "challenge.html" %}
+
+{% block challenge %}
+<div id="docker-challenge-view">
+    <!-- Challenge Description -->
+    <div class="challenge-description mb-4">
+        {{ description | safe }}
+    </div>
+
+    <!-- Container Control Section -->
+    <div class="card mb-4">
+        <div class="card-header bg-dark text-white">
+            <h5 class="mb-0">
+                <i class="fas fa-server"></i> Container Instance
+            </h5>
+        </div>
+        <div class="card-body">
+            <div id="container-status" class="mb-3">
+                <span class="badge badge-secondary">Not Started</span>
+            </div>
+
+            <!-- Container Controls -->
+            <div class="btn-group mb-3" role="group">
+                <button id="start-container-btn" class="btn btn-primary" onclick="startContainer()">
+                    <i class="fas fa-play"></i> Start Container
+                </button>
+                <button id="stop-container-btn" class="btn btn-danger" onclick="stopContainer()" style="display: none;">
+                    <i class="fas fa-stop"></i> Stop Container
+                </button>
+                <button id="renew-container-btn" class="btn btn-warning" onclick="renewContainer()" style="display: none;">
+                    <i class="fas fa-sync"></i> Renew Container
+                </button>
+            </div>
+
+            <!-- Connection Information Section -->
+            <div id="connection-section" style="display: none;">
+                <hr>
+                <h6 class="mb-3">
+                    <i class="fas fa-plug"></i> Connection Information
+                </h6>
+
+                <!-- Single Connection Display -->
+                <div id="single-connection" style="display: none;">
+                    <div class="connection-info-box p-3 bg-light border rounded">
+                        <div id="single-connection-content"></div>
+                    </div>
+                </div>
+
+                <!-- Multiple Connections Display -->
+                <div id="multiple-connections" style="display: none;">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        This challenge exposes multiple services. Use the appropriate connection method for each service.
+                    </div>
+                    <div id="connections-list"></div>
+                </div>
+            </div>
+
+            <!-- Loading Indicator -->
+            <div id="loading-indicator" style="display: none;">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="sr-only">Loading...</span>
+                </div>
+                <span class="ml-2">Starting container...</span>
+            </div>
+
+            <!-- Error Display -->
+            <div id="error-message" class="alert alert-danger" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- Challenge Hints, Files, etc. -->
+    {{ super() }}
+</div>
+
+<style>
+    .connection-info-box {
+        font-family: 'Courier New', monospace;
+        background-color: #f8f9fa;
+    }
+
+    .connection-item {
+        border: 1px solid #dee2e6;
+        border-radius: 0.25rem;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        background-color: #ffffff;
+    }
+
+    .connection-item.primary {
+        border-color: #007bff;
+        border-width: 2px;
+    }
+
+    .connection-item-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+    }
+
+    .connection-protocol-badge {
+        font-size: 0.8rem;
+        padding: 0.25rem 0.5rem;
+    }
+
+    .connection-string {
+        font-family: 'Courier New', monospace;
+        background-color: #f8f9fa;
+        padding: 0.75rem;
+        border-radius: 0.25rem;
+        border: 1px solid #dee2e6;
+        margin-top: 0.5rem;
+        word-break: break-all;
+        white-space: pre-wrap;
+    }
+
+    .protocol-http { background-color: #28a745; }
+    .protocol-https { background-color: #20c997; }
+    .protocol-ssh { background-color: #007bff; }
+    .protocol-tcp { background-color: #6c757d; }
+</style>
+
+<script>
+const challengeId = {{ id }};
+let containerRunning = false;
+let connectionData = null;
+
+function updateUI(status) {
+    const statusDiv = document.getElementById('container-status');
+    const startBtn = document.getElementById('start-container-btn');
+    const stopBtn = document.getElementById('stop-container-btn');
+    const renewBtn = document.getElementById('renew-container-btn');
+    const connectionSection = document.getElementById('connection-section');
+
+    if (status === 'running') {
+        statusDiv.innerHTML = '<span class="badge badge-success">Running</span>';
+        startBtn.style.display = 'none';
+        stopBtn.style.display = 'inline-block';
+        renewBtn.style.display = 'inline-block';
+        connectionSection.style.display = 'block';
+        containerRunning = true;
+    } else {
+        statusDiv.innerHTML = '<span class="badge badge-secondary">Not Started</span>';
+        startBtn.style.display = 'inline-block';
+        stopBtn.style.display = 'none';
+        renewBtn.style.display = 'none';
+        connectionSection.style.display = 'none';
+        containerRunning = false;
+    }
+}
+
+function displayConnections(connections) {
+    const singleConnection = document.getElementById('single-connection');
+    const multipleConnections = document.getElementById('multiple-connections');
+    const singleContent = document.getElementById('single-connection-content');
+    const connectionsList = document.getElementById('connections-list');
+
+    if (connections.length === 1) {
+        // Single connection - simple display
+        singleConnection.style.display = 'block';
+        multipleConnections.style.display = 'none';
+
+        const conn = connections[0];
+        singleContent.innerHTML = createSingleConnectionHTML(conn);
+    } else {
+        // Multiple connections - list display
+        singleConnection.style.display = 'none';
+        multipleConnections.style.display = 'block';
+
+        let html = '';
+        connections.forEach(conn => {
+            html += createConnectionItemHTML(conn);
+        });
+        connectionsList.innerHTML = html;
+    }
+}
+
+function createSingleConnectionHTML(conn) {
+    let html = `<strong>${conn.name}</strong><br>`;
+    html += `<code>${conn.connection}</code>`;
+
+    if (conn.protocol === 'http' || conn.protocol === 'https') {
+        html += `<br><a href="${conn.connection}" target="_blank" class="btn btn-sm btn-primary mt-2">
+            <i class="fas fa-external-link-alt"></i> Open in Browser
+        </a>`;
+    }
+
+    return html;
+}
+
+function createConnectionItemHTML(conn) {
+    const isPrimary = conn.primary ? 'primary' : '';
+    const protocolClass = `protocol-${conn.protocol}`;
+
+    let html = `<div class="connection-item ${isPrimary}">`;
+    html += `<div class="connection-item-header">`;
+    html += `<strong>${conn.name}</strong>`;
+    html += `<span class="badge connection-protocol-badge text-white ${protocolClass}">${conn.protocol.toUpperCase()}</span>`;
+    html += `</div>`;
+
+    if (conn.primary) {
+        html += `<div class="text-muted small mb-2"><i class="fas fa-star"></i> Primary Connection</div>`;
+    }
+
+    html += `<div class="connection-string">${escapeHtml(conn.connection)}</div>`;
+
+    if (conn.protocol === 'http' || conn.protocol === 'https') {
+        html += `<a href="${conn.connection}" target="_blank" class="btn btn-sm btn-primary mt-2">
+            <i class="fas fa-external-link-alt"></i> Open ${conn.name}
+        </a>`;
+    }
+
+    html += `</div>`;
+    return html;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function showLoading(show) {
+    document.getElementById('loading-indicator').style.display = show ? 'block' : 'none';
+}
+
+function showError(message) {
+    const errorDiv = document.getElementById('error-message');
+    errorDiv.textContent = message;
+    errorDiv.style.display = 'block';
+
+    setTimeout(() => {
+        errorDiv.style.display = 'none';
+    }, 5000);
+}
+
+async function startContainer() {
+    showLoading(true);
+    document.getElementById('error-message').style.display = 'none';
+
+    try {
+        const response = await fetch(`/docker/start/${challengeId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            connectionData = data.connections;
+            displayConnections(data.connections);
+            updateUI('running');
+        } else {
+            showError(data.message || 'Failed to start container');
+        }
+    } catch (error) {
+        showError('Error starting container: ' + error.message);
+    } finally {
+        showLoading(false);
+    }
+}
+
+async function stopContainer() {
+    if (!confirm('Are you sure you want to stop this container?')) {
+        return;
+    }
+
+    showLoading(true);
+
+    try {
+        const response = await fetch(`/docker/stop/${challengeId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            updateUI('stopped');
+        } else {
+            showError('Failed to stop container');
+        }
+    } catch (error) {
+        showError('Error stopping container: ' + error.message);
+    } finally {
+        showLoading(false);
+    }
+}
+
+async function renewContainer() {
+    await stopContainer();
+    setTimeout(() => {
+        startContainer();
+    }, 1000);
+}
+
+// Check container status on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Could add API call here to check if container is already running
+});
+</script>
+{% endblock %}
