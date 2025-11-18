@@ -61,15 +61,16 @@
 	<label>
 		Connect type<br>
 		<small class="form-text text-muted">
-			Connect via web, tcp, or ssh
+			Connect via web, tcp, ssh, or web-ssh
 		</small>
 	</label>
 	<select type="text" class="form-control" name="connection_type" placeholder="Connect via" id="connect-type"
-		title="Connect via web, tcp, or ssh" required>
+		title="Connect via web, tcp, ssh, or web-ssh" required>
 		<option value="" selected disabled>Choose a value...</option>
 		<option value="web">Web</option>
 		<option value="tcp">TCP</option>
 		<option value="ssh">SSH</option>
+		<option value="web-ssh">Web-SSH</option>
 	</select>
 </div>
 
@@ -204,7 +205,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 	function toggleSSHFields() {
 		const connectionType = connectTypeSelect.value;
-		if (connectionType === 'ssh') {
+		if (connectionType === 'ssh' || connectionType === 'web-ssh') {
 			sshUsernameGroup.style.display = 'block';
 			sshPasswordGroup.style.display = 'block';
 			sshUsernameInput.setAttribute('required', 'required');

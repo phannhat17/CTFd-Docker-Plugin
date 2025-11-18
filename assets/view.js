@@ -89,6 +89,76 @@ function createChallengeLinkElement(data, parent) {
             codeElement.textContent = 'sshpass -p' + data.ssh_password + " ssh -o StrictHostKeyChecking=no " + data.ssh_username + '@' + data.hostname + " -p" + data.port;
         }
         parent.append(codeElement);
+    } else if (data.connect == "web-ssh") {
+        // Web-SSH: Show HTTP link and SSH credentials
+        let link = document.createElement('a');
+        link.href = 'http://' + data.hostname + ":" + data.port;
+        link.textContent = 'http://' + data.hostname + ":" + data.port;
+        link.target = '_blank';
+        parent.append(link, document.createElement('br'), document.createElement('br'));
+
+        // SSH Username
+        let usernameLabel = document.createElement('strong');
+        usernameLabel.textContent = 'SSH Username:';
+        parent.append(usernameLabel, document.createElement('br'));
+
+        let usernameContainer = document.createElement('div');
+        usernameContainer.style.display = 'flex';
+        usernameContainer.style.alignItems = 'center';
+        usernameContainer.style.gap = '8px';
+        usernameContainer.style.marginBottom = '8px';
+
+        let usernameCode = document.createElement('code');
+        usernameCode.textContent = data.ssh_username;
+        usernameCode.style.padding = '4px 8px';
+        usernameCode.style.backgroundColor = '#f4f4f4';
+        usernameCode.style.borderRadius = '4px';
+        usernameCode.style.flex = '1';
+
+        let usernameCopyBtn = document.createElement('button');
+        usernameCopyBtn.textContent = '📋';
+        usernameCopyBtn.className = 'btn btn-sm btn-secondary';
+        usernameCopyBtn.title = 'Copy username';
+        usernameCopyBtn.onclick = function() {
+            navigator.clipboard.writeText(data.ssh_username);
+            usernameCopyBtn.textContent = '✓';
+            setTimeout(() => { usernameCopyBtn.textContent = '📋'; }, 2000);
+        };
+
+        usernameContainer.append(usernameCode, usernameCopyBtn);
+        parent.append(usernameContainer);
+
+        // SSH Password (if present)
+        if (data.ssh_password) {
+            let passwordLabel = document.createElement('strong');
+            passwordLabel.textContent = 'SSH Password:';
+            parent.append(passwordLabel, document.createElement('br'));
+
+            let passwordContainer = document.createElement('div');
+            passwordContainer.style.display = 'flex';
+            passwordContainer.style.alignItems = 'center';
+            passwordContainer.style.gap = '8px';
+
+            let passwordCode = document.createElement('code');
+            passwordCode.textContent = data.ssh_password;
+            passwordCode.style.padding = '4px 8px';
+            passwordCode.style.backgroundColor = '#f4f4f4';
+            passwordCode.style.borderRadius = '4px';
+            passwordCode.style.flex = '1';
+
+            let passwordCopyBtn = document.createElement('button');
+            passwordCopyBtn.textContent = '📋';
+            passwordCopyBtn.className = 'btn btn-sm btn-secondary';
+            passwordCopyBtn.title = 'Copy password';
+            passwordCopyBtn.onclick = function() {
+                navigator.clipboard.writeText(data.ssh_password);
+                passwordCopyBtn.textContent = '✓';
+                setTimeout(() => { passwordCopyBtn.textContent = '📋'; }, 2000);
+            };
+
+            passwordContainer.append(passwordCode, passwordCopyBtn);
+            parent.append(passwordContainer);
+        }
     } else {
         let link = document.createElement('a');
         link.href = 'http://' + data.hostname + ":" + data.port;
