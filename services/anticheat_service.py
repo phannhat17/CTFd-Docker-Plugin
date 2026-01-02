@@ -1,5 +1,5 @@
 """
-Anti-Cheat Service - Flag validation và cheat detection
+Anti-Cheat Service - Flag validation and cheat detection
 """
 import logging
 from datetime import datetime
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 class AntiCheatService:
     """
-    Service để validate flags và detect cheating
+    Service to validate flags and detect cheating
     """
     
     def __init__(self, flag_service: FlagService):
@@ -57,7 +57,7 @@ class AntiCheatService:
             user_agent=user_agent
         )
         
-        # 4. Flag không tồn tại → wrong
+        # 4. Flag does not exist → wrong
         if not flag_record:
             attempt.is_correct = False
             attempt.is_cheating = False
@@ -67,7 +67,7 @@ class AntiCheatService:
             logger.info(f"Account {account_id} submitted non-existent flag for challenge {challenge_id}")
             return (False, "Incorrect", False)
         
-        # 5. Flag đã invalidated → expired
+        # 5. Flag invalidated → expired
         if flag_record.flag_status == 'invalidated':
             attempt.is_correct = False
             attempt.is_cheating = False
@@ -77,7 +77,7 @@ class AntiCheatService:
             logger.info(f"Account {account_id} submitted invalidated flag for challenge {challenge_id}")
             return (False, "This flag has expired", False)
         
-        # 6. Flag thuộc account khác → CHEATING
+        # 6. Flag belongs to different account → CHEATING
         if flag_record.account_id != account_id:
             attempt.is_correct = False
             attempt.is_cheating = True
@@ -91,7 +91,7 @@ class AntiCheatService:
             is_team_mode = (mode == 'teams')
             
             if is_team_mode:
-                # Ban cả 2 teams và TẤT CẢ members của 2 teams đó
+                # Ban both teams and ALL members of both teams
                 cheater_team = Teams.query.get(account_id)
                 owner_team = Teams.query.get(flag_record.account_id)
                 
@@ -123,7 +123,7 @@ class AntiCheatService:
                     owner_user.banned = True
                     logger.critical(f"BANNED user {flag_record.account_id} ({owner_user.name}) for possible flag sharing")
             
-            # Audit log với severity critical
+            # Audit log with critical severity
             audit_log = ContainerAuditLog(
                 event_type='flag_reuse_detected',
                 challenge_id=challenge_id,
@@ -150,12 +150,12 @@ class AntiCheatService:
                 f"for challenge {challenge_id} - BOTH ACCOUNTS BANNED"
             )
             
-            # Không tiết lộ cho user biết flag reuse được phát hiện
+            # Don't reveal to user that flag reuse was detected
             return (False, "Incorrect", True)
         
-        # 7. Flag đúng và thuộc account này
+        # 7. Flag is correct and belongs to this account
         if flag_record.account_id == account_id:
-            # 7.1. Đã submit rồi (duplicate)
+            # 7.1. Already submitted (duplicate)
             if flag_record.flag_status == 'submitted_correct':
                 attempt.is_correct = True
                 attempt.is_cheating = False
@@ -165,7 +165,7 @@ class AntiCheatService:
                 logger.info(f"Account {account_id} re-submitted already solved challenge {challenge_id}")
                 return (True, "Already solved", False)
             
-            # 7.2. Lần đầu submit đúng
+            # 7.2. First correct submission
             flag_record.mark_as_submitted(user_id, ip_address)
             
             # Note: Do NOT update instance status here

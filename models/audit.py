@@ -7,7 +7,7 @@ from CTFd.models import db
 
 class ContainerAuditLog(db.Model):
     """
-    Audit log cho tất cả container events
+    Audit log for all container events
     
     Event types:
     - instance_created, instance_started, instance_accessed, instance_renewed
@@ -22,7 +22,10 @@ class ContainerAuditLog(db.Model):
     event_type = db.Column(db.String(50), nullable=False, index=True)
     
     # Context
-    instance_id = db.Column(db.Integer, db.ForeignKey('container_instances.id'))
+    instance_id = db.Column(
+        db.Integer, 
+        db.ForeignKey('container_instances.id', ondelete='CASCADE')
+    )
     challenge_id = db.Column(db.Integer, index=True)
     account_id = db.Column(db.Integer, index=True)
     user_id = db.Column(db.Integer, index=True)

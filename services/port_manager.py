@@ -1,5 +1,5 @@
 """
-Port Manager - Quản lý phân bổ ports
+Port Manager - Manage port allocation
 """
 import logging
 from CTFd.models import db
@@ -10,10 +10,10 @@ logger = logging.getLogger(__name__)
 
 class PortManager:
     """
-    Quản lý port pool
+    Manage port pool
     
-    Ports được cấu hình trong config (ví dụ: 30000-31000)
-    Service này track ports nào đang được dùng
+    Ports are configured in config (e.g., 30000-31000)
+    This service tracks which ports are in use
     """
     
     def __init__(self, port_range_start=30000, port_range_end=31000):

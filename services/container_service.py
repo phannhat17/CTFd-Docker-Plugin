@@ -1,5 +1,5 @@
 """
-Container Service - Business logic cho container lifecycle
+Container Service - Business logic for container lifecycle
 """
 import logging
 from datetime import datetime, timedelta
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 class ContainerService:
     """
-    Service quản lý container lifecycle
+    Service to manage container lifecycle
     """
     
     def __init__(self, docker_service: DockerService, flag_service: FlagService, port_manager: PortManager):
@@ -28,18 +28,18 @@ class ContainerService:
     
     def create_instance(self, challenge_id: int, account_id: int, user_id: int) -> ContainerInstance:
         """
-        Tạo container instance mới
+        Create new container instance
         
         Args:
             challenge_id: Challenge ID
-            account_id: Team ID (team mode) hoặc User ID (user mode)
-            user_id: User ID thực tế tạo container
+            account_id: Team ID (team mode) or User ID (user mode)
+            user_id: Actual user ID creating container
         
         Returns:
             ContainerInstance object
         
         Raises:
-            Exception nếu có lỗi
+            Exception if error occurs
         """
         # 1. Validate challenge exists
         challenge = ContainerChallenge.query.get(challenge_id)

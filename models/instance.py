@@ -8,16 +8,16 @@ from CTFd.models import db
 
 class ContainerInstance(db.Model):
     """
-    Đại diện cho một container instance
+    Represents a container instance
     
     Lifecycle:
-    - pending: Đang tạo DB record
-    - provisioning: Đang gọi Docker API
-    - running: Container đang chạy
-    - stopping: Đang dừng container
-    - stopped: Container đã dừng
-    - solved: User đã solve (flag submitted correct)
-    - error: Có lỗi xảy ra
+    - pending: Creating DB record
+    - provisioning: Calling Docker API
+    - running: Container is running
+    - stopping: Stopping container
+    - stopped: Container has stopped
+    - solved: User has solved (flag submitted correct)
+    - error: An error occurred
     """
     __tablename__ = 'container_instances'
     
@@ -33,7 +33,7 @@ class ContainerInstance(db.Model):
         index=True
     )
     
-    # Owner - account_id là team_id (team mode) hoặc user_id (user mode)
+    # Owner - account_id is team_id (team mode) or user_id (user mode)
     account_id = db.Column(db.Integer, nullable=False, index=True)
     
     # Docker container info
@@ -72,35 +72,42 @@ class ContainerInstance(db.Model):
     
     # Indexes
     __table_args__ = (
-        # Tìm active instance của account cho challenge
+        # Find active instance of account for challenge
         db.Index('idx_active_instance', 'challenge_id', 'account_id', 'status'),
-        # Tìm instances cần expire
+        # Find instances that need expiration
         db.Index('idx_expiration', 'status', 'expires_at'),
-        # Note: Unique constraint với partial index không support trong SQLite
-        # Sẽ handle logic "1 running instance per account" trong application layer
+        # Note: Unique constraint with partial index not supported in SQLite
+        # Will handle "1 running instance per account" logic in application layer
+    )
+    
+    # Relationships
+    challenge = db.relationship(
+        'ContainerChallenge',
+        foreign_keys=[challenge_id],
+        backref=db.backref('instances', lazy='dynamic', cascade='all, delete-orphan')
     )
     
     def is_active(self):
-        """Instance đang active"""
+        """Instance is active"""
         return self.status in ('running', 'provisioning')
     
     def is_expired(self):
-        """Instance đã hết hạn"""
+        """Instance has expired"""
         return datetime.utcnow() > self.expires_at
     
     def should_cleanup(self):
-        """Có nên cleanup record này không"""
+        """Should this record be cleaned up"""
         now = datetime.utcnow()
         
-        # Không cleanup solved instances
+        # Do not cleanup solved instances
         if self.status == 'solved':
             return False
         
-        # Cleanup stopped instances sau 24h
+        # Cleanup stopped instances after 24h
         if self.status == 'stopped' and self.stopped_at:
             return now - self.stopped_at > timedelta(hours=24)
         
-        # Cleanup error instances sau 1h
+        # Cleanup error instances after 1h
         if self.status == 'error' and self.created_at:
             return now - self.created_at > timedelta(hours=1)
         

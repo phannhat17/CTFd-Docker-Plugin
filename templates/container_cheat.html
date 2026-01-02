@@ -29,7 +29,7 @@
 			<tr>
 				<th class="text-center"><b>Time</b></th>
 				<th class="text-center"><b>Challenge</b></th>
-				<th class="text-center"><b>Flag</b></th>
+				<th class="text-center"><b>Flag Hash</b></th>
 				<th class="text-center"><b>Original Owner</b></th>
 				<th class="text-center"><b>Second Submitter</b></th>
 			</tr>
@@ -41,37 +41,37 @@
 					{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') if log.timestamp else 'N/A' }}
 				</td>
 				<td class="text-center">
-					<a href="{{ url_for('admin.challenges_detail', challenge_id=log.flag.challenge_id) }}">
-						{{ log.flag.challenge.name }}
+					<a href="{{ url_for('admin.challenges_detail', challenge_id=log.challenge_id) }}">
+						{{ log.challenge.name if log.challenge else 'Challenge #' ~ log.challenge_id }}
 					</a>
 				</td>
 				<td class="text-center">
-					<code>{{ log.flag.encrypted_flag[:20] }}...</code>
+					<code>{{ log.submitted_flag_hash[:20] }}...</code>
 				</td>
 				<td class="text-center">
-					{% if log.flag.team_id %}
-					<a href="{{ url_for('admin.teams_detail', team_id=log.flag.team_id) }}">
-						{{ log.flag.team.name }}
-					</a>
-					{% elif log.flag.user_id %}
-					<a href="{{ url_for('admin.users_detail', user_id=log.flag.user_id) }}">
-						{{ log.flag.user.name }}
-					</a>
+					{% if log.owner_team %}
+						<a href="{{ url_for('admin.teams_detail', team_id=log.owner_team.id) }}">
+							<i class="fas fa-users"></i> {{ log.owner_team.name }}
+						</a>
+					{% elif log.owner_user_obj %}
+						<a href="{{ url_for('admin.users_detail', user_id=log.owner_user_obj.id) }}">
+							<i class="fas fa-user"></i> {{ log.owner_user_obj.name }}
+						</a>
 					{% else %}
-					N/A
+						Account #{{ log.flag_owner_account_id if log.flag_owner_account_id else 'N/A' }}
 					{% endif %}
 				</td>
 				<td class="text-center">
-					{% if log.team_id %}
-					<a href="{{ url_for('admin.teams_detail', team_id=log.team_id) }}">
-						{{ log.team.name }}
-					</a>
-					{% elif log.user_id %}
-					<a href="{{ url_for('admin.users_detail', user_id=log.user_id) }}">
-						{{ log.user.name }}
-					</a>
+					{% if log.submitter_team %}
+						<a href="{{ url_for('admin.teams_detail', team_id=log.submitter_team.id) }}">
+							<i class="fas fa-users"></i> {{ log.submitter_team.name }}
+						</a>
+					{% elif log.submitter_user_obj %}
+						<a href="{{ url_for('admin.users_detail', user_id=log.submitter_user_obj.id) }}">
+							<i class="fas fa-user"></i> {{ log.submitter_user_obj.name }}
+						</a>
 					{% else %}
-					N/A
+						Account #{{ log.account_id }}
 					{% endif %}
 				</td>
 			</tr>

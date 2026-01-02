@@ -34,15 +34,23 @@ def set_services(d_service, c_service, a_service):
 @admins_only
 def dashboard():
     """Admin dashboard - overview of all containers"""
-    # Fetch all instances
-    instances = ContainerInstance.query.order_by(ContainerInstance.created_at.desc()).all()
+    # Fetch instances grouped by status
+    running_instances = ContainerInstance.query.filter_by(status='running').order_by(ContainerInstance.created_at.desc()).all()
+    provisioning_instances = ContainerInstance.query.filter_by(status='provisioning').order_by(ContainerInstance.created_at.desc()).all()
+    solved_instances = ContainerInstance.query.filter_by(status='solved').order_by(ContainerInstance.created_at.desc()).limit(20).all()
+    stopped_instances = ContainerInstance.query.filter_by(status='stopped').order_by(ContainerInstance.created_at.desc()).limit(20).all()
+    error_instances = ContainerInstance.query.filter_by(status='error').order_by(ContainerInstance.created_at.desc()).limit(10).all()
     
     # Get stats
-    running_count = ContainerInstance.query.filter_by(status='running').count()
+    running_count = len(running_instances)
     total_count = ContainerInstance.query.count()
     
     return render_template('container_dashboard.html',
-                         instances=instances,
+                         running_instances=running_instances,
+                         provisioning_instances=provisioning_instances,
+                         solved_instances=solved_instances,
+                         stopped_instances=stopped_instances,
+                         error_instances=error_instances,
                          running_count=running_count,
                          total_count=total_count)
 
@@ -67,11 +75,34 @@ def settings():
 @admins_only
 def cheats():
     """Cheat detection logs"""
-    # Get all cheat attempts (flag reuse)
+    from CTFd.models import Users, Teams
+    
+    # Get all cheat attempts (flag reuse) with relationships loaded
     cheat_logs = ContainerFlagAttempt.query.filter(
-        ContainerFlagAttempt.is_correct == True,
-        ContainerFlagAttempt.submitted_by_original_owner == False
+        ContainerFlagAttempt.is_cheating == True
     ).order_by(ContainerFlagAttempt.timestamp.desc()).all()
+    
+    # Load owner info (user or team) for each log
+    for log in cheat_logs:
+        # Get submitter info
+        submitter_user = Users.query.filter_by(id=log.user_id).first()
+        if submitter_user:
+            log.submitter_team = Teams.query.filter_by(id=submitter_user.team_id).first() if submitter_user.team_id else None
+            log.submitter_user_obj = submitter_user
+        
+        # Get flag owner info
+        if log.flag_owner_account_id:
+            # Try to find owner (could be user or team)
+            owner_user = Users.query.filter_by(id=log.flag_owner_account_id).first()
+            if owner_user:
+                log.owner_team = Teams.query.filter_by(id=owner_user.team_id).first() if owner_user.team_id else None
+                log.owner_user_obj = owner_user
+            else:
+                # Might be team account
+                owner_team = Teams.query.filter_by(id=log.flag_owner_account_id).first()
+                if owner_team:
+                    log.owner_team = owner_team
+                    log.owner_user_obj = None
     
     return render_template('container_cheat.html', cheat_logs=cheat_logs)
 

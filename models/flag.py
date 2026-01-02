@@ -7,12 +7,12 @@ from CTFd.models import db
 
 class ContainerFlag(db.Model):
     """
-    Track flags để chống gian lận
+    Track flags for anti-cheat
     
     Flag lifecycle:
-    - temporary: Flag vừa generate, chưa submit
-    - submitted_correct: Flag đã submit đúng → GIỮ VĨNH VIỄN
-    - invalidated: Flag bị vô hiệu (container expired chưa submit)
+    - temporary: Flag just generated, not submitted yet
+    - submitted_correct: Flag submitted correctly → KEEP FOREVER
+    - invalidated: Flag invalidated (container expired before submission)
     """
     __tablename__ = 'container_flags'
     
@@ -26,7 +26,7 @@ class ContainerFlag(db.Model):
         index=True
     )
     
-    # Flag hash (SHA256) - unique để detect reuse
+    # Flag hash (SHA256) - unique to detect reuse
     flag_hash = db.Column(db.String(64), unique=True, nullable=False, index=True)
     
     # Owner
@@ -71,8 +71,8 @@ class ContainerFlag(db.Model):
 
 class ContainerFlagAttempt(db.Model):
     """
-    Log mọi lần submit flag (đúng hay sai)
-    Để phát hiện brute force và flag reuse
+    Log every flag submission attempt (correct or wrong)
+    To detect brute force and flag reuse
     """
     __tablename__ = 'container_flag_attempts'
     
@@ -98,6 +98,22 @@ class ContainerFlagAttempt(db.Model):
     user_agent = db.Column(db.Text)
     
     timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    
+    # Relationships
+    challenge = db.relationship(
+        'Challenges',
+        foreign_keys=[challenge_id],
+        primaryjoin='ContainerFlagAttempt.challenge_id == Challenges.id',
+        backref='flag_attempts',
+        lazy='select'
+    )
+    
+    submitter = db.relationship(
+        'Users',
+        foreign_keys=[user_id],
+        primaryjoin='ContainerFlagAttempt.user_id == Users.id',
+        lazy='select'
+    )
     
     __table_args__ = (
         db.Index('idx_attempts_timeline', 'account_id', 'challenge_id', 'timestamp'),

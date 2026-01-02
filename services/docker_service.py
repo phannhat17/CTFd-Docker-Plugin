@@ -1,5 +1,5 @@
 """
-Docker Service - Quản lý Docker containers
+Docker Service - Manage Docker containers
 """
 import docker
 import logging
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 class DockerService:
     """
-    Service để tương tác với Docker daemon
+    Service to interact with Docker daemon
     """
     
     def __init__(self, base_url='unix://var/run/docker.sock'):
@@ -100,7 +100,7 @@ class DockerService:
                 image=image,
                 command=command,
                 detach=True,
-                auto_remove=False,  # Không auto remove để có thể inspect logs
+                auto_remove=False,  # Don't auto remove to be able to inspect logs
                 ports={f'{internal_port}/tcp': host_port},
                 environment=environment or {},
                 mem_limit=memory_limit,

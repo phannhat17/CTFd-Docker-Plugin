@@ -1,5 +1,25 @@
 {% extends "admin/base.html" %}
 
+{% block head %}
+<script>
+    // Convert UTC to GMT+7 (Vietnam time)
+    function utcToLocal(utcDateStr) {
+        const date = new Date(utcDateStr + 'Z'); // Z indicates UTC
+        const offset = 7 * 60; // GMT+7 in minutes
+        const localDate = new Date(date.getTime() + offset * 60000);
+        
+        const year = localDate.getFullYear();
+        const month = String(localDate.getMonth() + 1).padStart(2, '0');
+        const day = String(localDate.getDate()).padStart(2, '0');
+        const hours = String(localDate.getHours()).padStart(2, '0');
+        const minutes = String(localDate.getMinutes()).padStart(2, '0');
+        const seconds = String(localDate.getSeconds()).padStart(2, '0');
+        
+        return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    }
+</script>
+{% endblock %}
+
 {% block content %}
 <div class="jumbotron">
 	<div class="container">
@@ -49,8 +69,8 @@
 			</tr>
 		</thead>
 		<tbody>
-			{% if instances and instances|length > 0 %}
-			{% for instance in instances %}
+			{% if running_instances and running_instances|length > 0 %}
+			{% for instance in running_instances %}
 			<tr data-instance-id="{{ instance.id }}">
 				<td class="border-right text-center">
 					<input type="checkbox" class="form-check-input container-checkbox" value="{{ instance.id }}">
@@ -81,10 +101,10 @@
 						{{ instance.status }}
 					</span>
 				</td>
-				<td class="text-center">
+				<td class="text-center gmt7-convert" data-utc="{{ instance.created_at.strftime('%Y-%m-%d %H:%M:%S') if instance.created_at else '' }}">
 					{{ instance.created_at.strftime('%Y-%m-%d %H:%M:%S') if instance.created_at else 'N/A' }}
 				</td>
-				<td class="text-center">
+				<td class="text-center gmt7-convert" data-utc="{{ instance.expires_at.strftime('%Y-%m-%d %H:%M:%S') if instance.expires_at else '' }}">
 					{{ instance.expires_at.strftime('%Y-%m-%d %H:%M:%S') if instance.expires_at else 'Never' }}
 				</td>
 				<td class="text-center">
@@ -169,5 +189,15 @@ function bulkDeleteContainers() {
 	})
 	.catch(e => alert('Network error: ' + e));
 }
+
+// Convert all UTC times to GMT+7 on page load
+document.addEventListener('DOMContentLoaded', function() {
+	document.querySelectorAll('.gmt7-convert').forEach(cell => {
+		const utc = cell.getAttribute('data-utc');
+		if (utc && utc !== '') {
+			cell.innerHTML = utcToLocal(utc) + ' <small class="text-muted">(GMT+7)</small>';
+		}
+	});
+});
 </script>
 {% endblock %}

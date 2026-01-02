@@ -1,5 +1,5 @@
 """
-Flag Service - Flag generation và encryption
+Flag Service - Flag generation and encryption
 """
 import hashlib
 import random
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 class FlagService:
     """
-    Service để generate và manage flags
+    Service to generate and manage flags
     """
     
     def __init__(self):

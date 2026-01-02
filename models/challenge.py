@@ -6,7 +6,7 @@ from CTFd.models import db, Challenges
 
 class ContainerChallenge(Challenges):
     """
-    Challenge loại container - spawn Docker container cho mỗi team/user
+    Container challenge type - spawns Docker container for each team/user
     """
     __mapper_args__ = {"polymorphic_identity": "container"}
     __table_args__ = {'extend_existing': True}
@@ -41,7 +41,7 @@ class ContainerChallenge(Challenges):
     
     # Container lifecycle
     timeout_minutes = db.Column(db.Integer, default=60)  # Container auto-expire after N minutes
-    max_renewals = db.Column(db.Integer, default=3)  # Số lần renew tối đa
+    max_renewals = db.Column(db.Integer, default=3)  # Maximum number of renewals
     
     # Flag configuration
     flag_mode = db.Column(
