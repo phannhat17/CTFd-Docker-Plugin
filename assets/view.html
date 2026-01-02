@@ -1,8 +1,19 @@
-{% extends "challenge.html" %} {% block connection_info %}
-<div class="mb-3 text-center deployment-actions">
-  <!-- I dont event know why <script> not work in core-beta so .... -->
-  <img class="d-none" src onerror="view_container_info({{ challenge.id }})" />
-  <div class="alert alert-primary" id="deployment-info"></div>
+{% extends "challenge.html" %} 
+
+{% block scripts %}
+{{ super() }}
+<script>
+console.log("[Container INLINE] Script block executing");
+</script>
+{% endblock %}
+
+{% block connection_info %}
+<div class="mb-3 text-center deployment-actions" data-challenge-id="{{ challenge.id }}">
+  <div class="alert alert-primary" id="deployment-info">
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+  </div>
   <span>
     <button
       onclick="container_request({{ challenge.id }})"
@@ -27,4 +38,22 @@
     </button>
   </span>
 </div>
+<script>
+console.log("[Container INLINE] connection_info block script executing");
+console.log("[Container INLINE] Challenge ID: {{ challenge.id }}");
+if (typeof view_container_info === 'function') {
+    console.log("[Container INLINE] Calling view_container_info");
+    view_container_info({{ challenge.id }});
+} else {
+    console.log("[Container INLINE] view_container_info not defined yet, setting timeout");
+    setTimeout(function() {
+        if (typeof view_container_info === 'function') {
+            console.log("[Container INLINE] Calling view_container_info after timeout");
+            view_container_info({{ challenge.id }});
+        } else {
+            console.error("[Container INLINE] view_container_info still not defined!");
+        }
+    }, 500);
+}
+</script>
 {% endblock %}

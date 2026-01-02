@@ -1,55 +1,137 @@
-from __future__ import division
+"""
+Container Challenge Plugin
 
-import time
-import json
-import datetime
+Spawn Docker containers cho challenges với anti-cheat system
+"""
 import math
-
-from flask import Blueprint, request, Flask, render_template, url_for, redirect, flash
-
-from CTFd.models import db, Solves, Teams, Users
+import logging
+from flask import Flask
 from CTFd.plugins import register_plugin_assets_directory
 from CTFd.plugins.challenges import CHALLENGE_CLASSES, BaseChallenge
+from CTFd.models import db, Solves
 from CTFd.utils.modes import get_model
-from .models import ContainerChallengeModel, ContainerInfoModel, ContainerSettingsModel, ContainerFlagModel, ContainerCheatLog  
-from .container_manager import ContainerManager, ContainerException
-from .admin_routes import admin_bp, set_container_manager as set_admin_manager
-from .user_routes import containers_bp, set_container_manager as set_user_manager
-from .helpers import *
 from CTFd.utils.user import get_current_user
+from CTFd.utils import get_config
 
-settings = json.load(open(get_settings_path()))
+# Import models
+from .models import (
+    ContainerChallenge,
+    ContainerInstance,
+    ContainerFlag,
+    ContainerFlagAttempt,
+    ContainerAuditLog,
+    ContainerConfig
+)
 
-class ContainerChallenge(BaseChallenge):
-    id = settings["plugin-info"]["id"]
-    name = settings["plugin-info"]["name"]
-    templates = settings["plugin-info"]["templates"]
-    scripts = settings["plugin-info"]["scripts"]
-    route = settings["plugin-info"]["base_path"]
+# Import services
+from .services import (
+    DockerService,
+    FlagService,
+    ContainerService,
+    AntiCheatService,
+    PortManager
+)
 
-    challenge_model = ContainerChallengeModel
+# Import routes
+from .routes import user_bp, admin_bp
+from .routes.user import set_services as set_user_services
+from .routes.admin import set_services as set_admin_services
 
+logger = logging.getLogger(__name__)
+
+
+class ContainerChallengeType(BaseChallenge):
+    """
+    Container Challenge Type for CTFd
+    
+    Spawns Docker containers cho players với:
+    - Random hoặc static flags
+    - Auto-expiration
+    - Anti-cheat detection
+    - Resource limits
+    """
+    id = "container"
+    name = "container"
+    templates = {
+        "create": "/plugins/containers/assets/create.html",
+        "update": "/plugins/containers/assets/update.html",
+        "view": "/plugins/containers/assets/view.html",
+    }
+    scripts = {
+        "create": "/plugins/containers/assets/create.js",
+        "update": "/plugins/containers/assets/update.js",
+        "view": "/plugins/containers/assets/view.js",
+    }
+    route = "/plugins/containers/assets/"
+    blueprint = None
+    challenge_model = ContainerChallenge
+    
+    @classmethod
+    def create(cls, request):
+        """
+        Override create to handle field name mapping
+        """
+        from CTFd.models import db
+        
+        data = request.form or request.get_json()
+        
+        # Field mapping from UI to DB attributes
+        field_mapping = {
+            'initial': 'container_initial',
+            'minimum': 'container_minimum',
+            'decay': 'container_decay',
+            'connection_type': 'container_connection_type',
+            'connection_info': 'container_connection_info',
+        }
+        
+        # Map field names
+        mapped_data = {}
+        for key, value in data.items():
+            mapped_key = field_mapping.get(key, key)
+            mapped_data[mapped_key] = value
+        
+        # Create challenge with mapped data
+        challenge = cls.challenge_model(**mapped_data)
+        
+        # Set initial value
+        if 'container_initial' in mapped_data:
+            challenge.value = mapped_data['container_initial']
+        elif 'initial' in data:
+            challenge.value = data['initial']
+        
+        db.session.add(challenge)
+        db.session.commit()
+        
+        # Create a dummy flag to prevent CTFd from showing "Missing Flags" warning
+        # The actual flag validation happens in the solve() method
+        from CTFd.models import Flags
+        dummy_flag = Flags(
+            challenge_id=challenge.id,
+            type='static',
+            content='[Container flag - auto-generated per instance]',
+            data=''
+        )
+        db.session.add(dummy_flag)
+        db.session.commit()
+        
+        return challenge
+    
     @classmethod
     def read(cls, challenge):
         """
-        This method is in used to access the data of a challenge in a format processable by the front end.
-
-        :param challenge:
-        :return: Challenge object, data dictionary to be returned to the user
+        Read challenge data for frontend
+        
+        Args:
+            challenge: ContainerChallenge object
+        
+        Returns:
+            Challenge data dict
         """
         data = {
             "id": challenge.id,
             "name": challenge.name,
             "value": challenge.value,
-            "image": challenge.image,
-            "port": challenge.port,
-            "command": challenge.command,
-            "connection_type": challenge.connection_type,
-            "initial": challenge.initial,
-            "decay": challenge.decay,
-            "minimum": challenge.minimum,
             "description": challenge.description,
-            "connection_info": challenge.connection_info,
             "category": challenge.category,
             "state": challenge.state,
             "max_attempts": challenge.max_attempts,
@@ -60,13 +142,182 @@ class ContainerChallenge(BaseChallenge):
                 "templates": cls.templates,
                 "scripts": cls.scripts,
             },
+            # Container specific
+            "image": challenge.image,
+            "internal_port": challenge.internal_port,
+            "connection_type": challenge.container_connection_type,
+            "connection_info": challenge.container_connection_info,
+            "timeout_minutes": challenge.timeout_minutes,
+            "max_renewals": challenge.max_renewals,
+            "flag_mode": challenge.flag_mode,
+            # Dynamic scoring
+            "initial": challenge.container_initial,
+            "minimum": challenge.container_minimum,
+            "decay": challenge.container_decay,
         }
         return data
-
+    
+    @classmethod
+    def update(cls, challenge, request):
+        """
+        Update challenge data
+        
+        Args:
+            challenge: ContainerChallenge object
+            request: Flask request object
+        
+        Returns:
+            Updated challenge
+        """
+        data = request.form or request.get_json()
+        
+        # Field mapping from UI to DB attributes
+        # Note: Some fields have `name=` in column definition for backward compatibility
+        field_mapping = {
+            'initial': 'container_initial',
+            'minimum': 'container_minimum',
+            'decay': 'container_decay',
+            'connection_type': 'container_connection_type',
+            'connection_info': 'container_connection_info',
+        }
+        
+        for attr, value in data.items():
+            # Skip if empty
+            if value == '':
+                continue
+            
+            # Map field name to actual attribute
+            db_attr = field_mapping.get(attr, attr)
+            
+            # Convert types
+            if db_attr in ('container_initial', 'container_minimum', 'container_decay'):
+                value = int(value)
+            elif db_attr in ('cpu_limit',):
+                value = float(value)
+            elif db_attr in ('internal_port', 'timeout_minutes', 'max_renewals', 'random_flag_length', 'pids_limit'):
+                value = int(value)
+            
+            setattr(challenge, db_attr, value)
+        
+        # Set initial value
+        if 'initial' in data or 'container_initial' in data:
+            challenge.value = challenge.container_initial
+        
+        # Ensure dummy flag exists to prevent "Missing Flags" warning
+        from CTFd.models import Flags, db
+        existing_flags = Flags.query.filter_by(challenge_id=challenge.id).count()
+        if existing_flags == 0:
+            dummy_flag = Flags(
+                challenge_id=challenge.id,
+                type='static',
+                content='[Container flag - auto-generated per instance]',
+                data=''
+            )
+            db.session.add(dummy_flag)
+        
+        db.session.commit()
+        
+        return challenge
+    
+    @classmethod
+    def solve(cls, user, team, challenge, request):
+        """
+        Called when solve is created
+        
+        Args:
+            user: User object
+            team: Team object
+            challenge: Challenge object
+            request: Flask request
+        """
+        super().solve(user, team, challenge, request)
+        cls.calculate_value(challenge)
+    
+    @classmethod
+    def attempt(cls, challenge, request):
+        """
+        Validate flag submission
+        
+        Args:
+            challenge: ContainerChallenge object
+            request: Flask request with submission
+        
+        Returns:
+            (is_correct: bool, message: str)
+        """
+        # Get current user
+        user = get_current_user()
+        if not user:
+            return False, "You must be logged in"
+        
+        # Get account ID based on mode
+        mode = get_config('user_mode')
+        is_team_mode = (mode == 'teams')
+        
+        if is_team_mode:
+            if not user.team_id:
+                return False, "You must be on a team"
+            account_id = user.team_id
+        else:
+            account_id = user.id
+        
+        # Get submitted flag
+        data = request.form or request.get_json()
+        submitted_flag = data.get("submission", "").strip()
+        
+        if not submitted_flag:
+            return False, "No flag provided"
+        
+        # Use anticheat service to validate
+        from . import anticheat_service
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        is_correct, message, is_cheating = anticheat_service.validate_flag(
+            challenge_id=challenge.id,
+            account_id=account_id,
+            user_id=user.id,
+            submitted_flag=submitted_flag
+        )
+        
+        logger.info(f"Flag validation result: is_correct={is_correct}, message='{message}', is_cheating={is_cheating}")
+        
+        # If correct, stop container
+        if is_correct:
+            logger.info(f"Correct flag submitted for challenge {challenge.id} by account {account_id}")
+            # Find and stop container instance
+            instance = ContainerInstance.query.filter_by(
+                challenge_id=challenge.id,
+                account_id=account_id,
+                status='running'
+            ).first()
+            
+            if instance:
+                logger.info(f"Stopping instance {instance.uuid} after successful solve")
+                from . import container_service
+                try:
+                    container_service.stop_instance(instance, user.id, reason='solved')
+                    logger.info(f"Successfully stopped instance {instance.uuid}")
+                except Exception as e:
+                    logger.error(f"Failed to stop instance {instance.uuid}: {e}", exc_info=True)
+            else:
+                logger.warning(f"No running instance found for challenge {challenge.id}, account {account_id}")
+        
+        return is_correct, message
+    
     @classmethod
     def calculate_value(cls, challenge):
+        """
+        Calculate dynamic challenge value based on solves
+        
+        Args:
+            challenge: ContainerChallenge object
+        
+        Returns:
+            Updated challenge
+        """
         Model = get_model()
-
+        
         solve_count = (
             Solves.query.join(Model, Solves.account_id == Model.id)
             .filter(
@@ -76,135 +327,192 @@ class ContainerChallenge(BaseChallenge):
             )
             .count()
         )
-
-        # If the solve count is 0 we shouldn't manipulate the solve count to
-        # let the math update back to normal
+        
+        # Subtract 1 so first solver gets max points
         if solve_count != 0:
-            # We subtract -1 to allow the first solver to get max point value
             solve_count -= 1
-
-        # It is important that this calculation takes into account floats.
-        # Hence this file uses from __future__ import division
+        
+        # Dynamic scoring formula
         value = (
-            ((challenge.minimum - challenge.initial) / (challenge.decay**2))
-            * (solve_count**2)
-        ) + challenge.initial
-
+            ((challenge.container_minimum - challenge.container_initial) / (challenge.container_decay ** 2))
+            * (solve_count ** 2)
+        ) + challenge.container_initial
+        
         value = math.ceil(value)
-
-        if value < challenge.minimum:
-            value = challenge.minimum
-
+        
+        if value < challenge.container_minimum:
+            value = challenge.container_minimum
+        
         challenge.value = value
         db.session.commit()
+        
         return challenge
 
-    @classmethod
-    def update(cls, challenge, request):
-        """
-        This method is used to update the information associated with a challenge. This should be kept strictly to the
-        Challenges table and any child tables.
-        :param challenge:
-        :param request:
-        :return:
-        """
-        data = request.form or request.get_json()
 
-        for attr, value in data.items():
-            # We need to set these to floats so that the next operations don't operate on strings
-            if attr in ("initial", "minimum", "decay"):
-                value = float(value)
-            setattr(challenge, attr, value)
+# Global service instances
+docker_service = None
+flag_service = None
+container_service = None
+anticheat_service = None
+port_manager = None
 
-        return ContainerChallenge.calculate_value(challenge)
-
-    @classmethod
-    def solve(cls, user, team, challenge, request):
-        super().solve(user, team, challenge, request)
-
-        cls.calculate_value(challenge)
-
-    @classmethod
-    def attempt(cls, challenge, request):
-        # 1) Gather user/team & submitted_flag
-        try:
-            user, x_id, submitted_flag = get_xid_and_flag()
-        except ValueError as e:
-            return False, str(e)
-
-        # 2) Get running container
-        container_info = None
-        try:
-            container_info = get_active_container(challenge.id, x_id)
-        except ValueError as e:
-            return False, str(e)
-
-        # 3) Check if container is actually running
-        from . import container_manager
-        if not container_manager or not container_manager.is_container_running(container_info.container_id):
-            return False, "Your container is not running; you cannot submit yet."
-
-        # Validate the flag belongs to the user/team
-        try:
-            container_flag = get_container_flag(submitted_flag, user, container_manager, container_info, challenge)
-        except ValueError as e:
-            return False, str(e)  # Return incorrect flag message if not cheating
-
-        # 6) Mark used & kill container => success
-        container_flag.used = True
-        db.session.commit()
-
-        # **If the challenge is static, delete both flag and container records**
-        if challenge.flag_mode == "static":
-            db.session.delete(container_flag)
-            db.session.commit()
-        
-        # **If the challenge is random, keep the flag but delete only the container info**
-        if challenge.flag_mode == "random":
-            db.session.query(ContainerFlagModel).filter_by(container_id=container_info.container_id).update({"container_id": None})
-            db.session.commit()
-
-        # Remove container info record
-        container = ContainerInfoModel.query.filter_by(container_id=container_info.container_id).first()
-        if container:
-            db.session.delete(container)
-            db.session.commit()
-
-        # Kill the container
-        container_manager.kill_container(container_info.container_id)
-
-        return True, "Correct"
-
-container_manager = None  # Global
 
 def load(app: Flask):
-    # Ensure database is initialized
+    """
+    Plugin entry point
+    
+    Args:
+        app: Flask app instance
+    """
+    global docker_service, flag_service, container_service, anticheat_service, port_manager
+    
+    logger.info("Loading Container Challenge Plugin")
+    
+    # Create database tables
     app.db.create_all()
-
-    # Register the challenge type
-    CHALLENGE_CLASSES["container"] = ContainerChallenge
-
+    
+    # Initialize default config
+    _initialize_default_config()
+    
+    # Initialize services
+    try:
+        # Docker service
+        docker_socket = ContainerConfig.get('docker_socket', 'unix://var/run/docker.sock')
+        docker_service = DockerService(base_url=docker_socket)
+        logger.info(f"Docker service initialized: {docker_socket}")
+    except Exception as e:
+        logger.error(f"Failed to initialize Docker service: {e}")
+        docker_service = None
+    
+    # Flag service
+    flag_service = FlagService()
+    logger.info("Flag service initialized")
+    
+    # Port manager
+    port_start = int(ContainerConfig.get('port_range_start', 30000))
+    port_end = int(ContainerConfig.get('port_range_end', 31000))
+    port_manager = PortManager(port_start, port_end)
+    logger.info(f"Port manager initialized: {port_start}-{port_end}")
+    
+    # Container service
+    if docker_service:
+        container_service = ContainerService(docker_service, flag_service, port_manager)
+        logger.info("Container service initialized")
+    else:
+        logger.warning("Container service not initialized (Docker unavailable)")
+    
+    # Anticheat service
+    anticheat_service = AntiCheatService(flag_service)
+    logger.info("Anticheat service initialized")
+    
+    # Register challenge type
+    CHALLENGE_CLASSES["container"] = ContainerChallengeType
+    logger.info("Registered container challenge type")
+    
+    # Register plugin assets
     register_plugin_assets_directory(
-        app, base_path=settings["plugin-info"]["base_path"]
+        app, base_path="/plugins/containers/assets/"
     )
+    
+    # Register template folder
+    from jinja2 import FileSystemLoader, ChoiceLoader
+    from os import path
+    plugin_dir = path.dirname(__file__)
+    template_folder = path.join(plugin_dir, 'templates')
+    
+    # Add plugin templates to Jinja loader
+    if isinstance(app.jinja_loader, ChoiceLoader):
+        loaders = list(app.jinja_loader.loaders)
+        loaders.insert(0, FileSystemLoader(template_folder))
+        app.jinja_loader = ChoiceLoader(loaders)
+    else:
+        app.jinja_loader = ChoiceLoader([
+            FileSystemLoader(template_folder),
+            app.jinja_loader
+        ])
+    logger.info(f"Registered template folder: {template_folder}")
+    
+    # Inject services into routes
+    set_user_services(container_service, flag_service, anticheat_service)
+    set_admin_services(docker_service, container_service, anticheat_service)
+    
+    # Register blueprints
+    app.register_blueprint(user_bp)
+    app.register_blueprint(admin_bp)
+    logger.info("Registered blueprints")
+    
+    # Setup background jobs
+    _setup_background_jobs(app)
+    
+    logger.info("Container Challenge Plugin loaded successfully")
 
-    global container_manager
-    container_settings = settings_to_dict(ContainerSettingsModel.query.all())
-    container_manager = ContainerManager(container_settings, app)
 
-    base_bp = Blueprint(
-        "containers",
-        __name__,
-        template_folder=settings["blueprint"]["template_folder"],
-        static_folder=settings["blueprint"]["static_folder"]
-    )
+def _initialize_default_config():
+    """Initialize default configuration if not exists"""
+    defaults = {
+        'docker_socket': 'unix://var/run/docker.sock',
+        'connection_host': 'localhost',
+        'port_range_start': '30000',
+        'port_range_end': '31000',
+        'default_timeout': '60',
+        'max_renewals': '3',
+        'max_memory': '512m',
+        'max_cpu': '0.5',
+    }
+    
+    for key, value in defaults.items():
+        if ContainerConfig.get(key) is None:
+            ContainerConfig.set(key, value)
+            logger.info(f"Set default config: {key}={value}")
 
-    set_admin_manager(container_manager)
-    set_user_manager(container_manager)
 
-    # Register the blueprints
-    app.register_blueprint(admin_bp)  # Admin APIs
-    app.register_blueprint(containers_bp) # User APIs
+def _setup_background_jobs(app):
+    """
+    Setup background jobs for cleanup
+    
+    TODO: Sử dụng APScheduler hoặc Celery cho production
+    """
+    try:
+        from apscheduler.schedulers.background import BackgroundScheduler
+        
+        scheduler = BackgroundScheduler()
+        
+        # Cleanup expired instances every 1 minute
+        if container_service:
+            scheduler.add_job(
+                func=lambda: _run_with_app_context(app, container_service.cleanup_expired_instances),
+                trigger="interval",
+                minutes=1,
+                id='cleanup_expired'
+            )
+            logger.info("Scheduled: cleanup_expired_instances (every 1 minute)")
+        
+        # Cleanup old instances every 1 hour
+        if container_service:
+            scheduler.add_job(
+                func=lambda: _run_with_app_context(app, container_service.cleanup_old_instances),
+                trigger="interval",
+                hours=1,
+                id='cleanup_old'
+            )
+            logger.info("Scheduled: cleanup_old_instances (every 1 hour)")
+        
+        scheduler.start()
+        
+        # Shutdown scheduler on app exit
+        import atexit
+        atexit.register(lambda: scheduler.shutdown())
+        
+    except ImportError:
+        logger.warning("APScheduler not installed, background jobs disabled")
+    except Exception as e:
+        logger.error(f"Failed to setup background jobs: {e}")
 
 
-    app.register_blueprint(base_bp)
+def _run_with_app_context(app, func):
+    """Run function with app context"""
+    with app.app_context():
+        try:
+            func()
+        except Exception as e:
+            logger.error(f"Error in background job: {e}")

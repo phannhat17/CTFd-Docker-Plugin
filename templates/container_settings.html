@@ -1,84 +1,122 @@
-{% extends "container_base.html" %}
+{% extends "admin/base.html" %}
 
+{% block content %}
+<div class="jumbotron">
+	<div class="container">
+		<h1>Container Settings</h1>
+	</div>
+</div>
+<div class="container-fluid">
+	<ul class="nav nav-tabs mb-3">
+		<li class="nav-item">
+			<a class="nav-link" href="{{ url_for('containers_admin.dashboard') }}">Instances</a>
+		</li>
+		<li class="nav-item">
+			<a class="nav-link active" href="{{ url_for('containers_admin.settings') }}">Settings</a>
+		</li>
+		<li class="nav-item">
+			<a class="nav-link" href="{{ url_for('containers_admin.cheats') }}">Anti-Cheat Logs</a>
+		</li>
+	</ul>
 
-{% block menu %}
-<li class="nav-item">
-    <a class="nav-link" href="/containers/admin/dashboard">&#128279; Instances</a>
-</li>
-<li class="nav-item">
-    <a class="nav-link active" data-toggle="pill" href="#settings">Settings</a>
-</li>
-<li class="nav-item">
-    <a class="nav-link" href="/containers/admin/cheat">&#128279; Share flag</a>
-</li>
+	<form id="settings-form">
+		<div class="card">
+			<div class="card-header">
+				<h5>Docker Configuration</h5>
+			</div>
+			<div class="card-body">
+				<div class="form-group">
+					<label for="docker_base_url">Docker Socket URL</label>
+					<input class="form-control" type="text" name="docker_socket" id="docker_base_url"
+						placeholder="unix://var/run/docker.sock or ssh://root@example.com"
+						value="{{ settings.docker_base_url }}">
+					<small class="form-text text-muted">
+						The local socket address or remote SSH address for Docker daemon
+					</small>
+				</div>
+
+				<div class="form-group">
+					<label for="docker_hostname">Connection Hostname</label>
+					<input class="form-control" type="text" name="connection_host" id="docker_hostname"
+						placeholder="example.com or 10.0.1.8"
+						value="{{ settings.docker_hostname }}">
+					<small class="form-text text-muted">
+						Hostname displayed to users in connection strings
+					</small>
+				</div>
+
+				<div class="form-group">
+					<label for="container_expiration">Default Container Timeout (minutes)</label>
+					<input class="form-control" type="number" name="default_timeout" id="container_expiration"
+						placeholder="30" value="{{ settings.container_expiration }}">
+					<small class="form-text text-muted">
+						How long containers run before auto-termination (0 = never)
+					</small>
+				</div>
+
+				<div class="form-group">
+					<label for="max_renewals">Default Max Renewals</label>
+					<input class="form-control" type="number" name="max_renewals" id="max_renewals"
+						placeholder="3" value="{{ settings.max_renewals }}">
+					<small class="form-text text-muted">
+						Maximum number of times users can extend container lifetime
+					</small>
+				</div>
+
+				<div class="form-group">
+					<label for="container_maxmemory">Max Memory per Container</label>
+					<input class="form-control" type="text" name="max_memory" id="container_maxmemory"
+						placeholder="512m" value="{{ settings.container_maxmemory }}">
+					<small class="form-text text-muted">
+						e.g., 512m, 1g
+					</small>
+				</div>
+
+				<div class="form-group">
+					<label for="container_maxcpu">Max CPUs per Container</label>
+					<input class="form-control" type="text" name="max_cpu" id="container_maxcpu"
+						placeholder="1.0" value="{{ settings.container_maxcpu }}">
+					<small class="form-text text-muted">
+						Float value, e.g., 1.5 means 1.5 cores maximum
+					</small>
+				</div>
+			</div>
+		</div>
+
+		<div class="form-group mt-3">
+			<button type="submit" class="btn btn-primary">
+				<i class="fas fa-save"></i> Save Settings
+			</button>
+		</div>
+	</form>
+</div>
 {% endblock %}
 
-{% block panel %}
-{% include "components/errors.html" %}
-<div role="tabpanel" class="tab-pane config-section active" id="settings">
-    <form method="post" action="/containers/admin/api/settings" accept-charset="utf-8" autocomplete="off" role="form"
-        class="form-horizontal" enctype="multipart/form-data">
-        <div class="tab-content">
-            <div class="tab-pane fade show active" id="docker" role="tabpanel" aria-autocomplete="none">
-                <h5>Instructions</h5>
-                <p class="form-text text-muted">
-                    The Base URL should be the local socket address of the Docker daemon, i.e. <code>unix://var/run/docker.sock</code>, or it can be a remote SSH address, e.g. <code>ssh://root@example.com</code>. In either case, sudo will not be executed. For a local socket, the user CTFd is running as should have permissions for Docker; for SSH connections, the SSH user in the Base URL should be root or have Docker permissions.
-                </p>
-
-                <div class="form-group">
-                    <label for="docker_base_url">
-                        Base URL (see instructions)
-                    </label>
-                    <input class="form-control" type="text" name="docker_base_url" id="docker_base_url"
-                        placeholder="E.g. unix://var/run/docker.sock or ssh://root@example.com"
-                        value='{{ settings.docker_base_url|default("") }}' />
-                </div>
-
-                <div class="form-group">
-                    <label for="docker_hostname">
-                        Hostname for Docker Host (this is what's displayed to the user in the connection string)
-                    </label>
-                    <input class="form-control" type="text" name="docker_hostname" id="docker_hostname"
-                        placeholder="e.g. example.com or 10.0.1.8" value='{{ settings.docker_hostname|default("") }}' />
-                </div>
-                <div class="form-group">
-                    <label for="container_expiration">
-                        Container Expiration in Minutes (how long a container will last before it's killed; 0 = never)
-                    </label>
-                    <input class="form-control" type="text" name="container_expiration" id="container_expiration"
-                        placeholder="e.g. 30" value='{{ settings.container_expiration|default("") }}' />
-                </div>
-                <div class="form-group">
-                    <label for="max_containers">
-                        Max Containers Per User/Team
-                    </label>
-                    <input class="form-control" type="number" name="max_containers" id="max_containers"
-                        placeholder="e.g. 3" value='{{ settings.max_containers|default("3") }}' />
-                </div>
-                <div class="form-group">
-                    <label for="container_maxmemory">
-                        Maximum per-container memory usage (in MB)
-                    </label>
-                    <input class="form-control" type="number" name="container_maxmemory" id="container_maxmemory"
-                        placeholder="e.g. 1000" value='{{ settings.container_maxmemory|default("") }}' />
-                </div>
-                <div class="form-group">
-                    <label for="container_maxcpu">
-                        Maximum per-container CPUs (float, e.g 1.5 means 1.5 cores at most)
-                    </label>
-                    <input class="form-control" type="text" name="container_maxcpu" id="container_maxcpu"
-                        placeholder="e.g. 1.5" value='{{ settings.container_maxcpu|default("") }}' />
-                </div>
-
-                <div class="submit-row float-right">
-                    <button type="submit" tabindex="0" class="btn btn-md btn-primary btn-outlined">
-                        Submit
-                    </button>
-                    <input type="hidden" name="nonce" value="{{ Session.nonce }}">
-                </div>
-            </div>
-        </div>
-    </form>
-    {% include "config/container_status.html" %}
-</div>
+{% block scripts %}
+<script>
+document.getElementById('settings-form').addEventListener('submit', function(e) {
+	e.preventDefault();
+	const formData = new FormData(this);
+	const data = Object.fromEntries(formData);
+	
+	fetch('{{ url_for("containers_admin.api_config_update") }}', {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			'CSRF-Token': '{{ Session.nonce }}'
+		},
+		body: JSON.stringify(data)
+	})
+	.then(r => r.json())
+	.then(data => {
+		if (data.success) {
+			alert('Settings saved successfully');
+			location.reload();
+		} else {
+			alert('Error: ' + (data.error || 'Unknown error'));
+		}
+	})
+	.catch(e => alert('Network error: ' + e));
+});
+</script>
 {% endblock %}

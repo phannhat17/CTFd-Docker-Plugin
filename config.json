@@ -1,4 +1,4 @@
 {
 	"name": "Containers",
-	"route": "/containers/admin/dashboard"
+	"route": "/admin/containers/dashboard"
 }

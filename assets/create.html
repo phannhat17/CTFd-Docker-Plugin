@@ -7,15 +7,6 @@
 {% endblock %}
 
 {% block value %}
-<div class="form-group d-none">
-	<label>
-		Connection Info<br>
-		<small class="form-text text-muted">
-			Use this to specify a link, hostname, or connection instructions for your challenge.
-		</small>
-	</label>
-	<input type="text" class="form-control chal-connection-info" name="connection_info" value="Container">
-</div>
 <div class="form-group">
 	<label for="value">Initial Value<br>
 		<small class="form-text text-muted">
@@ -23,7 +14,6 @@
 		</small>
 	</label>
 	<input type="number" class="form-control" name="initial" placeholder="Enter value" required>
-
 </div>
 
 <div class="form-group">
@@ -67,30 +57,70 @@
 	<select type="text" class="form-control" name="connection_type" placeholder="Connect via" id="connect-type"
 		title="Connect via web or tcp" required>
 		<option value="" selected disabled>Choose a value...</option>
-		<option value="web">Web</option>
+		<option value="http">Web (HTTP)</option>
 		<option value="tcp">TCP</option>
+		<option value="ssh">SSH</option>
 	</select>
 </div>
 
 <div class="form-group">
 	<label>
-		Port<br>
+		Internal Port<br>
 		<small class="form-text text-muted">
 			Internal container port that should be exposed (external port will be automatically assigned)
 		</small>
 	</label>
-	<input type="number" class="form-control" name="port" placeholder="Enter port" required>
+	<input type="number" class="form-control" name="internal_port" placeholder="Enter port" required>
 </div>
 
 <div class="form-group">
 	<label>
-		Volumes<br>
+		Docker Command (Optional)<br>
 		<small class="form-text text-muted">
-			Custom volumes to mount, in JSON. E.g.
-			<pre>{"/home/user1/": {"bind": "/mnt/vol2", "mode": "rw"}, "/var/www": {"bind": "/mnt/vol1", "mode": "ro"}}</pre>
+			Custom command to run in container (leave empty to use image default)
 		</small>
 	</label>
-	<input type="text" class="form-control" name="volumes" placeholder="Enter volumes or leave blank">
+	<input type="text" class="form-control" name="command" placeholder="/bin/bash -c 'your command'">
+</div>
+
+<div class="form-group">
+	<label>
+		Container Timeout (minutes)<br>
+		<small class="form-text text-muted">
+			How long containers will run before auto-termination (uses global setting by default)
+		</small>
+	</label>
+	<input type="number" class="form-control" name="timeout_minutes" placeholder="60">
+</div>
+
+<div class="form-group">
+	<label>
+		Max Renewals<br>
+		<small class="form-text text-muted">
+			Maximum number of times users can extend container lifetime (uses global setting by default)
+		</small>
+	</label>
+	<input type="number" class="form-control" name="max_renewals" placeholder="3">
+</div>
+
+<div class="form-group">
+	<label>
+		Memory Limit<br>
+		<small class="form-text text-muted">
+			Maximum memory per container (e.g., 512m, 1g, uses global setting by default)
+		</small>
+	</label>
+	<input type="text" class="form-control" name="memory_limit" placeholder="512m">
+</div>
+
+<div class="form-group">
+	<label>
+		CPU Limit<br>
+		<small class="form-text text-muted">
+			Maximum CPU cores per container (e.g., 0.5 = 50% of one core, uses global setting by default)
+		</small>
+	</label>
+	<input type="number" step="0.1" class="form-control" name="cpu_limit" placeholder="0.5">
 </div>
 <!-- Flag Mode, Prefix, Suffix, and Random Length -->
 <div class="form-group">

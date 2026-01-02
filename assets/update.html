@@ -5,11 +5,11 @@
 	<label>
 		Connection Info<br>
 		<small class="form-text text-muted">
-			Use this to specify a link, hostname, or connection instructions for your challenge.
+			Auto-generated from container connection settings
 		</small>
 	</label>
 	<input type="text" class="form-control chal-connection-info" name="connection_info"
-		value="{{ challenge.connection_info | default('Container', true) }}">
+		value="{{ challenge.container_connection_info | default('', true) }}" readonly>
 </div>
 {% endblock %}
 
@@ -29,7 +29,7 @@
 			This is how many points the challenge was worth initially.
 		</small>
 	</label>
-	<input type="number" class="form-control chal-initial" name="initial" value="{{ challenge.initial }}" required>
+	<input type="number" class="form-control chal-initial" name="initial" value="{{ challenge.container_initial }}" required>
 </div>
 
 <div class="form-group">
@@ -38,7 +38,7 @@
 			The amount of solves before the challenge reaches its minimum value
 		</small>
 	</label>
-	<input type="number" class="form-control chal-decay" name="decay" value="{{ challenge.decay }}" required>
+	<input type="number" class="form-control chal-decay" name="decay" value="{{ challenge.container_decay }}" required>
 </div>
 
 <div class="form-group">
@@ -47,12 +47,13 @@
 			This is the lowest that the challenge can be worth
 		</small>
 	</label>
-	<input type="number" class="form-control chal-minimum" name="minimum" value="{{ challenge.minimum }}" required>
+	<input type="number" class="form-control chal-minimum" name="minimum" value="{{ challenge.container_minimum }}" required>
 </div>
 
 <div class="form-group">
 	<script>
 		var container_image_selected = "{{ challenge.image }}";
+		var container_connection_type_selected = "{{ challenge.container_connection_type }}";
 	</script>
 	<label>
 		Image<br>
@@ -70,36 +71,76 @@
 	<label>
 		Connect type<br>
 		<small class="form-text text-muted">
-			Connect via web or tcp
+			Connect via HTTP, TCP, or SSH
 		</small>
 	</label>
 	<select type="text" class="form-control" name="connection_type" placeholder="Connect via" id="connect-type"
 		title="Connect via web or tcp" required>
-		<option value="" id="connect-type-default" selected disabled>Choose a value...</option>
-		<option value="web">Web</option>
+		<option value="" selected disabled>Choose a value...</option>
+		<option value="http">Web (HTTP)</option>
 		<option value="tcp">TCP</option>
+		<option value="ssh">SSH</option>
 	</select>
 </div>
 
 <div class="form-group">
 	<label>
-		Port<br>
+		Internal Port<br>
 		<small class="form-text text-muted">
 			Internal container port that should be exposed (external port will be automatically assigned)
 		</small>
 	</label>
-	<input type="number" class="form-control" name="port" value="{{ challenge.port }}" required>
+	<input type="number" class="form-control" name="internal_port" value="{{ challenge.internal_port }}" required>
 </div>
 
 <div class="form-group">
 	<label>
-		Volumes<br>
+		Docker Command (Optional)<br>
 		<small class="form-text text-muted">
-			Custom volumes to mount, in JSON. E.g.
-			<pre>{"/home/user1/": {"bind": "/mnt/vol2", "mode": "rw"}, "/var/www": {"bind": "/mnt/vol1", "mode": "ro"}}</pre>
+			Custom command to run in container (leave empty to use image default)
 		</small>
 	</label>
-	<input type="text" class="form-control" name="volumes" value="{{ challenge.volumes }}">
+	<input type="text" class="form-control" name="command" value="{{ challenge.command }}">
+</div>
+
+<div class="form-group">
+	<label>
+		Container Timeout (minutes)<br>
+		<small class="form-text text-muted">
+			How long containers will run before auto-termination
+		</small>
+	</label>
+	<input type="number" class="form-control" name="timeout_minutes" value="{{ challenge.timeout_minutes }}">
+</div>
+
+<div class="form-group">
+	<label>
+		Max Renewals<br>
+		<small class="form-text text-muted">
+			Maximum number of times users can extend container lifetime
+		</small>
+	</label>
+	<input type="number" class="form-control" name="max_renewals" value="{{ challenge.max_renewals }}">
+</div>
+
+<div class="form-group">
+	<label>
+		Memory Limit<br>
+		<small class="form-text text-muted">
+			Maximum memory per container (e.g., 512m, 1g)
+		</small>
+	</label>
+	<input type="text" class="form-control" name="memory_limit" value="{{ challenge.memory_limit }}">
+</div>
+
+<div class="form-group">
+	<label>
+		CPU Limit<br>
+		<small class="form-text text-muted">
+			Maximum CPU cores per container (e.g., 0.5 = 50% of one core)
+		</small>
+	</label>
+	<input type="number" step="0.1" class="form-control" name="cpu_limit" value="{{ challenge.cpu_limit }}">
 </div>
 <!-- Flag Mode, Prefix, Suffix, Random Length -->
 <div class="form-group">
