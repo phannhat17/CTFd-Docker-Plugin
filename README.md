@@ -89,7 +89,9 @@ Challenge Containers: challenges.example.com:30000  (separate subdomain)
 
 ## Configuration
 
-Access admin panel: **Admin → Containers → Settings**
+Access admin panel: **Admin → Plugin → Containers → Settings**
+
+![](./image-readme/settings.png)
 
 ### Global Settings
 - **Docker Socket Path**: Default `/var/run/docker.sock`
@@ -105,6 +107,7 @@ Access admin panel: **Admin → Containers → Settings**
 ## Creating Challenges
 
 ### Via Admin UI
+![alt text](./image-readme/create.png)
 
 1. **Go to:** Admin → Challenges → Create Challenge → Container
 2. **Fill in basic info:**
@@ -115,42 +118,25 @@ Access admin panel: **Admin → Containers → Settings**
    - **Image**: Docker image with tag (e.g., `nginx:latest`, `ubuntu:20.04`)
    - **Internal Port**: Port exposed inside container
    - **Command**: Optional startup command
+![alt text](./image-readme/docker.png)
 
 4. **Set Flag Pattern:**
    - Static: `CTF{my_static_flag}`
-   - Random: `CTF{prefix_<ran_16>_suffix}`
-     - `<ran_N>` generates N random characters
+   - Random: `CTF{prefix_<ran_16>_suffix}`: `<ran_N>` generates N random characters
+![](./image-readme/flag.png)
 
 5. **Choose Scoring:**
    - **Standard**: Fixed points
    - **Dynamic**: Initial value, decay rate, minimum value, decay function
+![alt text](./image-readme/score.png)
 
 ### Via CSV Import
 
 1. **Go to:** Admin → Containers → Import
+
+![alt text](./image-readme/import.png)
+
 2. **Prepare CSV file** with these columns:
-
-#### Required Columns
-- `name`: Challenge name
-- `category`: Challenge category
-- `image`: **Docker image WITH version tag** (e.g., `nginx:latest`, `alpine:3.18`)
-
-#### Optional Columns
-- `description`: Challenge description (supports Markdown)
-- `internal_port`: Container port (default: 22)
-- `command`: Docker startup command
-- `connection_type`: `ssh`, `http`, `nc`, `custom` (default: ssh)
-- `connection_info`: Extra connection instructions
-- `flag_pattern`: Flag format (default: `CTF{flag}`)
-  - Static: `CTF{my_flag}`
-  - Random: `CTF{prefix_<ran_8>_suffix}`
-- `scoring_type`: `standard` or `dynamic` (default: standard)
-- `value`: Points for standard scoring (default: 100)
-- `initial`: Initial points for dynamic scoring (default: 500)
-- `decay`: Decay value for dynamic scoring (default: 20)
-- `minimum`: Minimum points for dynamic scoring (default: 100)
-- `decay_function`: `linear` or `logarithmic` (default: logarithmic)
-- `state`: `visible` or `hidden` (default: visible)
 
 #### Example CSV
 
@@ -171,11 +157,16 @@ Simple Challenge,Misc,Easy one,alpine:latest,22,,tcp,Just connect,CTF{static_fla
 ### Requesting Container
 
 1. User clicks **"Fetch Instance"** button on challenge page
+
+![](./image-readme/user.png)
+
 2. Container spawns within seconds
 3. Connection info displayed:
    - HTTP: Browser link
-   - SSH: `ssh user@host -p port`
    - TCP: `nc host port`
+
+![](./image-readme/http.png)
+![](./image-readme/tcp.png)
 
 ### Container Lifecycle
 
@@ -194,8 +185,10 @@ Simple Challenge,Misc,Easy one,alpine:latest,22,,tcp,Just connect,CTF{static_fla
 
 Access: **Admin → Containers → Instances**
 
+![alt text](./image-readme/instances.png)
+
 ### Features
-- **Real-time Status**: Running, stopped, solved containers
+- **Real-time Status**: Running containers
 - **Auto-Reload**: Dashboard refreshes every 15 seconds
 - **Manual Refresh**: Button to force immediate update
 - **Container Info**:
@@ -207,6 +200,8 @@ Access: **Admin → Containers → Instances**
 
 ### Cheat Detection
 
+![alt text](./image-readme/cheats.png)
+
 Access: **Admin → Containers → Cheat Logs**
 
 Shows all detected flag-sharing attempts with:
@@ -216,18 +211,6 @@ Shows all detected flag-sharing attempts with:
 - Original owner
 - Second submitter
 - Automatic ban status
-
-## Credits
-
-Built for CTFd 3.8+ with modern CTF competition requirements in mind.
-
-**Features:**
-- Dynamic container spawning
-- Anti-cheat detection system
-- Flexible scoring models
-- Bulk import capabilities
-- Real-time admin dashboard
-- Redis-based precision timing
 
 ## Roadmap
 
