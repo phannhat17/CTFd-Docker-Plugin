@@ -1,194 +1,201 @@
-# CTFd Docker Containers Plugin
+# CTFd Docker Container Challenge Plugin
 
-<div align="center">
-  <h3 align="center">CTFd Docker Containers Plugin</h3>
-  <p align="center">
-    A plugin to create containerized challenges for your CTF contest.
-  </p>
-</div>
+A comprehensive CTFd plugin that enables dynamic Docker container challenges with advanced features including anti-cheat detection, automatic flag generation, dynamic scoring, and bulk import capabilities.
 
-## Table of Contents
-1. [Getting Started](#getting-started)
-   - [Prerequisites](#prerequisites)
-   - [Installation](#installation)
-2. [Usage](#usage)
-   - [Using Local Docker Daemon](#using-local-docker-daemon)
-   - [Using Remote Docker via SSH](#using-remote-docker-via-ssh)
-3. [Demo](#demo)
-4. [Roadmap](#roadmap)
-5. [License](#license)
-6. [Contact](#contact)
+## Features
 
----
+### 🐳 Container Management
+- **Dynamic Container Spawning**: Each team/user gets their own isolated Docker container
+- **Automatic Lifecycle Management**: Containers auto-expire after configurable timeout
+- **Resource Control**: Global limits for CPU, memory, and process count
+- **Port Management**: Automatic port allocation and mapping
+- **Custom Naming**: Containers named as `challengename_accountid` for easy identification
 
-> [!WARNING]
-> The current cheating-detection algorithm is very slow, so it is NOT recommended for competitions with many participants.
+### 🚨 Anti-Cheat System
+- **Flag Reuse Detection**: Automatically detects when teams share flags
+- **Instant Ban**: Both flag owner and submitter get banned immediately
+- **Cheat Dashboard**: Admin view of all detected cheating attempts
 
-## Getting Started
+### 🎯 Scoring Options
+- **Standard Scoring**: Fixed points per challenge
+- **Dynamic Scoring**: Points decay as more teams solve
+  - Linear decay: `value = initial - (decay × solves)`
+  - Logarithmic decay: Parabolic curve with minimum floor
 
-This section provides instructions for setting up the project locally.
+### 🔐 Flag Generation
+- **Static Flags**: Same flag for all teams (e.g., `CTF{static_flag}`)
+- **Random Flags**: Unique per-team flags with pattern (e.g., `CTF{this_is_the_flag_<ran_8>}` -> `CTF{this_is_the_flag_xxxxxxxx}`)
+- **Automatic Preview**: Real-time flag pattern preview during challenge creation
 
-### Prerequisites
+### 📊 Bulk Import
+- **CSV Import**: Import multiple challenges at once
+- **Format Validation**: Automatic parsing and error reporting
+- **Progress Tracking**: Real-time feedback during import
 
-To use this plugin, you should have:
-- Experience hosting CTFd with Docker
-- Basic knowledge of Docker
-- SSH access to remote servers (if using remote Docker)
+### ⚡ Performance
+- **Redis-Based Expiration**: Precise container killing (0-second accuracy)
+- **Efficient Port Management**: Thread-safe port allocation
+- **Database Optimization**: Indexed queries for fast lookups
 
-### Installation
+## Installation
 
-1. **Clone this repository:**
-   ```bash
-   git clone https://github.com/phannhat17/CTFd-Docker-Plugin.git
-   ```
-2. **Rename the folder:**
-   ```bash
-   mv CTFd-Docker-Plugin containers
-   ```
-3. **Move the folder to the CTFd plugins directory:**
-   ```bash
-   mv containers /path/to/CTFd/plugins/
-   ```
+3. **Configure Docker socket access:**
+```yaml
+# In docker-compose.yml
+  ctfd:
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+```
 
-[Back to top](#ctfd-docker-containers-plugin)
+4. **Enable Redis keyspace notifications:**
+```yaml
+# In docker-compose.yml
+cache:
+  command: redis-server --notify-keyspace-events Ex --appendonly yes
+```
 
----
+## Configuration
 
-## Usage
+Access admin panel: **Admin → Containers → Settings**
 
-### Using Local Docker Daemon
+### Global Settings
+- **Docker Socket Path**: Default `/var/run/docker.sock`
+- **Container Timeout**: Minutes before auto-expiration (default: 60)
+- **Max Renewals**: How many times users can extend (default: 3)
+- **Port Range**: Starting port for container mapping (default: 30000)
+- **Resource Limits**:
+  - Memory: Default `512m`
+  - CPU: Default `0.5` cores
+  - PIDs: Default `100` processes
 
-#### Case A: **CTFd Running Directly on Host:**
-  - Go to the plugin settings page: `/containers/settings`
-  - Fill in all fields except the `Base URL`.
+## Creating Challenges
 
-  ![Settings Example](./image-readme/1.png)
+### Via Admin UI
 
-#### Case B: **CTFd Running via Docker:**
-  - Map the Docker socket into the CTFd container by modify the `docker-compose.yml` file:
-  ```bash
-  services:
-    ctfd:
-      ...
-      volumes:
-        - /var/run/docker.sock:/var/run/docker.sock
-      ...
-  ```
-  - Restart CTFd
-  - Go to the plugin settings page: `/containers/settings`
-  - Fill in all fields except the `Base URL`.
+1. **Go to:** Admin → Challenges → Create Challenge → Container
+2. **Fill in basic info:**
+   - Name, Category, Description
+   - State (visible/hidden)
 
-### Using Remote Docker via SSH
+3. **Configure Docker:**
+   - **Image**: Docker image with tag (e.g., `nginx:latest`, `ubuntu:20.04`)
+   - **Internal Port**: Port exposed inside container
+   - **Command**: Optional startup command
 
-For remote Docker, the CTFd host must have SSH access to the remote server.
+4. **Set Flag Pattern:**
+   - Static: `CTF{my_static_flag}`
+   - Random: `CTF{prefix_<ran_16>_suffix}`
+     - `<ran_N>` generates N random characters
 
-#### Prerequisites:
-- **SSH access** from the CTFd host to the Docker server
-- The remote server's fingerprint should be in the `known_hosts` file
-- SSH key files (`id_rsa`) and an SSH config file should be available
+5. **Choose Scoring:**
+   - **Standard**: Fixed points
+   - **Dynamic**: Initial value, decay rate, minimum value, decay function
 
-#### Case A: **CTFd Running via Docker**
+### Via CSV Import
 
-1. **Prepare SSH Config:**
-   ```bash
-   mkdir ssh_config
-   cp ~/.ssh/id_rsa ~/.ssh/known_hosts ~/.ssh/config ssh_config/
-   ```
+1. **Go to:** Admin → Containers → Import
+2. **Prepare CSV file** with these columns:
 
-2. **Mount SSH Config into the CTFd container:**
-   ```yaml
-   services:
-     ctfd:
-       ...
-       volumes:
-         - ./ssh_config:/root/.ssh:ro
-       ...
-   ```
+#### Required Columns
+- `name`: Challenge name
+- `category`: Challenge category
+- `image`: **Docker image WITH version tag** (e.g., `nginx:latest`, `alpine:3.18`)
 
-3. **Restart CTFd:**
-   ```bash
-   docker-compose down
-   docker-compose up -d
-   ```
+#### Optional Columns
+- `description`: Challenge description (supports Markdown)
+- `internal_port`: Container port (default: 22)
+- `command`: Docker startup command
+- `connection_type`: `ssh`, `http`, `nc`, `custom` (default: ssh)
+- `connection_info`: Extra connection instructions
+- `flag_pattern`: Flag format (default: `CTF{flag}`)
+  - Static: `CTF{my_flag}`
+  - Random: `CTF{prefix_<ran_8>_suffix}`
+- `scoring_type`: `standard` or `dynamic` (default: standard)
+- `value`: Points for standard scoring (default: 100)
+- `initial`: Initial points for dynamic scoring (default: 500)
+- `decay`: Decay value for dynamic scoring (default: 20)
+- `minimum`: Minimum points for dynamic scoring (default: 100)
+- `decay_function`: `linear` or `logarithmic` (default: logarithmic)
+- `state`: `visible` or `hidden` (default: visible)
 
-#### Case B: **CTFd Running Directly on Host**
+#### Example CSV
 
-1. **Ensure SSH Access:**
-   - Test the connection:
-     ```bash
-     ssh user@remote-server
-     ```
+```csv
+name,category,description,image,internal_port,command,connection_type,connection_info,flag_pattern,scoring_type,value,initial,decay,minimum,decay_function,state
+Web Challenge,Web,Find the flag in web app,nginx:latest,80,,http,Access via browser,CTF{web_<ran_8>},dynamic,,500,25,100,logarithmic,visible
+SSH Challenge,Pwn,Get root access,ubuntu:20.04,22,/usr/sbin/sshd -D,ssh,user:ctf pass:ctf,CTF{ssh_<ran_16>},dynamic,,500,20,100,logarithmic,visible
+Simple Challenge,Misc,Easy one,alpine:latest,22,,tcp,Just connect,CTF{static_flag},standard,50,,,,standard,visible
+```
 
-2. **Configure Docker Base URL:**
-   - In the CTFd plugin settings page (`/containers/settings`), set:
-     ```
-     Base URL: ssh://user@remote-server
-     ```
+**⚠️ IMPORTANT:** Docker image MUST include version tag (`:latest`, `:20.04`, etc.)
 
-3. **Restart CTFd:**
-   ```bash
-   sudo systemctl restart ctfd
-   ```
+3. **Upload CSV** and wait for import to complete
+4. **Check results**: Success/error messages will be displayed
 
-[Back to top](#ctfd-docker-containers-plugin)
+## User Experience
 
----
+### Requesting Container
 
-## Demo
+1. User clicks **"Fetch Instance"** button on challenge page
+2. Container spawns within seconds
+3. Connection info displayed:
+   - HTTP: Browser link
+   - SSH: `ssh user@host -p port`
+   - TCP: `nc host port`
 
-### Admin Dashboard
-- Manage running containers
-- Filter by challenge or player
+### Container Lifecycle
 
-![Manage Containers](./image-readme/manage.png)
+- **Initial Timeout**: Set by admin (default: 60 minutes)
+- **Extend**: Users can extend +5 minutes (up to max renewals limit)
+- **Auto-Expire**: Container killed exactly at expiration time
+- **Auto-Stop**: Container killed when flag submitted correctly
 
-### Challenge View
+### Flag Submission
 
-**Web Access** | **TCP Access**
-:-------------:|:-------------:
-![Web](./image-readme/http.png) | ![TCP](./image-readme/tcp.png)
+- **Static Flags**: Same for all teams
+- **Random Flags**: Unique per team, auto-generated
+- **Anti-Cheat**: Reusing another team's flag = instant ban
 
-### Live Demo
+## Admin Dashboard
 
-![Live Demo](./image-readme/demo.gif)
+Access: **Admin → Containers → Instances**
 
-[Back to top](#ctfd-docker-containers-plugin)
+### Features
+- **Real-time Status**: Running, stopped, solved containers
+- **Auto-Reload**: Dashboard refreshes every 15 seconds
+- **Manual Refresh**: Button to force immediate update
+- **Container Info**:
+  - Challenge name
+  - Team/User (clickable links)
+  - Connection port
+  - Expiry countdown
+  - Actions (stop, delete)
 
----
+### Cheat Detection
 
-## Roadmap
+Access: **Admin → Containers → Cheat Logs**
 
-- [x] Support for user mode
-- [x] Admin dashboard with team/user filtering
-- [x] Compatibility with the core-beta theme
-- [x] Monitor share flag 
-- [ ] Monitor detail on share flag 
-- [ ] Prevent container creation on solved challenge
+Shows all detected flag-sharing attempts with:
+- Timestamp
+- Challenge name
+- Flag hash
+- Original owner
+- Second submitter
+- Automatic ban status
 
-For more features and known issues, check the [open issues](https://github.com/phannhat17/CTFd-Docker-Plugin/issues).
+## Credits
 
-[Back to top](#ctfd-docker-containers-plugin)
+Built for CTFd 3.8+ with modern CTF competition requirements in mind.
 
----
+**Features:**
+- Dynamic container spawning
+- Anti-cheat detection system
+- Flexible scoring models
+- Bulk import capabilities
+- Real-time admin dashboard
+- Redis-based precision timing
 
 ## License
 
-Distributed under the MIT License. See `LICENSE.txt` for details.
-
-> This plugin is an upgrade of [andyjsmith's plugin](https://github.com/andyjsmith/CTFd-Docker-Plugin) with additional features.
-
-If there are licensing concerns, please reach out via email (contact below).
-
-[Back to top](#ctfd-docker-containers-plugin)
-
----
-
-## Contact
-
-**Phan Nhat**  
-- **Discord:** ftpotato  
-- **Email:** contact@phannhat.id.vn  
-- **Project Link:** [CTFd Docker Plugin](https://github.com/phannhat17/CTFd-Docker-Plugin)
-
-[Back to top](#ctfd-docker-containers-plugin)
+See LICENSE file.
 
