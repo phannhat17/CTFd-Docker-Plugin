@@ -15,39 +15,78 @@
 
 {% block value %}
 <div class="form-group">
-	<label for="value">Current Value<br>
+	<label for="scoring_type">Scoring Type<br>
 		<small class="form-text text-muted">
-			This is how many points the challenge is worth right now.
+			Choose between static points or dynamic decay scoring
 		</small>
 	</label>
-	<input type="number" class="form-control chal-value" name="value" value="{{ challenge.value }}" disabled>
+	<select class="form-control" id="scoring_type" name="scoring_type">
+		<option value="standard" {% if challenge.type == 'standard' or not challenge.container_decay %}selected{% endif %}>Standard (Fixed Points)</option>
+		<option value="dynamic" {% if challenge.container_decay %}selected{% endif %}>Dynamic (Decay-based)</option>
+	</select>
 </div>
 
-<div class="form-group">
-	<label for="value">Initial Value<br>
-		<small class="form-text text-muted">
-			This is how many points the challenge was worth initially.
-		</small>
-	</label>
-	<input type="number" class="form-control chal-initial" name="initial" value="{{ challenge.container_initial }}" required>
+<!-- Standard Scoring -->
+<div id="standard-scoring" class="scoring-section" {% if challenge.container_decay %}style="display: none;"{% endif %}>
+	<div class="form-group">
+		<label for="value">Points<br>
+			<small class="form-text text-muted">
+				Fixed number of points for this challenge
+			</small>
+		</label>
+		<input type="number" class="form-control" name="value" id="standard_value" value="{{ challenge.value if not challenge.container_decay else '' }}">
+	</div>
 </div>
 
-<div class="form-group">
-	<label for="value">Decay Limit<br>
-		<small class="form-text text-muted">
-			The amount of solves before the challenge reaches its minimum value
-		</small>
-	</label>
-	<input type="number" class="form-control chal-decay" name="decay" value="{{ challenge.container_decay }}" required>
-</div>
+<!-- Dynamic Scoring -->
+<div id="dynamic-scoring" class="scoring-section" {% if not challenge.container_decay %}style="display: none;"{% endif %}>
+	<div class="form-group">
+		<label for="value">Current Value<br>
+			<small class="form-text text-muted">
+				This is how many points the challenge is worth right now.
+			</small>
+		</label>
+		<input type="number" class="form-control chal-value" name="current_value" value="{{ challenge.value }}" disabled>
+	</div>
 
-<div class="form-group">
-	<label for="value">Minimum Value<br>
-		<small class="form-text text-muted">
-			This is the lowest that the challenge can be worth
-		</small>
-	</label>
-	<input type="number" class="form-control chal-minimum" name="minimum" value="{{ challenge.container_minimum }}" required>
+	<div class="form-group">
+		<label for="initial">Initial Value<br>
+			<small class="form-text text-muted">
+				This is how many points the challenge was worth initially.
+			</small>
+		</label>
+		<input type="number" class="form-control chal-initial" name="initial" id="dynamic_initial" value="{{ challenge.container_initial }}">
+	</div>
+
+	<div class="form-group">
+		<label for="decay_function">Decay Function<br>
+			<small class="form-text text-muted">
+				How the points decrease as more teams solve
+			</small>
+		</label>
+		<select class="form-control" name="decay_function" id="decay_function">
+			<option value="linear" {% if challenge.decay_function == 'linear' or not challenge.decay_function %}selected{% endif %}>Linear</option>
+			<option value="logarithmic" {% if challenge.decay_function == 'logarithmic' %}selected{% endif %}>Logarithmic</option>
+		</select>
+	</div>
+
+	<div class="form-group">
+		<label for="decay">Decay Limit<br>
+			<small class="form-text text-muted">
+				The number of solves before the challenge reaches its minimum value
+			</small>
+		</label>
+		<input type="number" class="form-control chal-decay" name="decay" id="dynamic_decay" value="{{ challenge.container_decay }}">
+	</div>
+
+	<div class="form-group">
+		<label for="minimum">Minimum Value<br>
+			<small class="form-text text-muted">
+				This is the lowest that the challenge can be worth
+			</small>
+		</label>
+		<input type="number" class="form-control chal-minimum" name="minimum" id="dynamic_minimum" value="{{ challenge.container_minimum }}">
+	</div>
 </div>
 
 <div class="form-group">
@@ -103,114 +142,50 @@
 	<input type="text" class="form-control" name="command" value="{{ challenge.command }}">
 </div>
 
+<!-- Flag Pattern Configuration -->
 <div class="form-group">
-	<label>
-		Container Timeout (minutes)<br>
+	<label for="flag_pattern">Flag Pattern<br>
 		<small class="form-text text-muted">
-			How long containers will run before auto-termination
-		</small>
-	</label>
-	<input type="number" class="form-control" name="timeout_minutes" value="{{ challenge.timeout_minutes }}">
-</div>
-
-<div class="form-group">
-	<label>
-		Max Renewals<br>
-		<small class="form-text text-muted">
-			Maximum number of times users can extend container lifetime
-		</small>
-	</label>
-	<input type="number" class="form-control" name="max_renewals" value="{{ challenge.max_renewals }}">
-</div>
-
-<div class="form-group">
-	<label>
-		Memory Limit<br>
-		<small class="form-text text-muted">
-			Maximum memory per container (e.g., 512m, 1g)
-		</small>
-	</label>
-	<input type="text" class="form-control" name="memory_limit" value="{{ challenge.memory_limit }}">
-</div>
-
-<div class="form-group">
-	<label>
-		CPU Limit<br>
-		<small class="form-text text-muted">
-			Maximum CPU cores per container (e.g., 0.5 = 50% of one core)
-		</small>
-	</label>
-	<input type="number" step="0.1" class="form-control" name="cpu_limit" value="{{ challenge.cpu_limit }}">
-</div>
-<!-- Flag Mode, Prefix, Suffix, Random Length -->
-<div class="form-group">
-	<label for="flag_mode">Flag Mode
-		<br>
-		<small class="form-text text-muted">
+			<strong>Easy flag configuration! Just enter your flag pattern:</strong>
 			<ul>
-				<li><strong>Static Mode:</strong>
+				<li><strong>Static flag:</strong> <code>CTF{this_is_the_flag}</code> → Same flag for everyone</li>
+				<li><strong>Random flag:</strong> <code>CTF{this_is_the_flag_&lt;ran_8&gt;}</code> → Unique flag per team/user
 					<ul>
-						<li>The flag follows a fixed format:
-							<code>&lt;prefix&gt; + &lt;flag content&gt; + &lt;suffix&gt;</code>
-						</li>
-						<li>Example: If your flag is <code>CTF{this_is_the_flag}</code>, you provide:
-							<ul>
-								<li><strong>Prefix:</strong> <code>CTF{this_is_the_flag</code></li>
-								<li><strong>Suffix:</strong> <code>}</code></li>
-								<li><strong>Random Length:</strong> Leave as default</li>
-							</ul>
-						</li>
-					</ul>
-				</li>
-				<li><strong>Random Mode:</strong>
-					<ul>
-						<li>The flag follows the format:
-							<code>&lt;prefix&gt; + &lt;random part (length defined)&gt; + &lt;suffix&gt;</code>
-						</li>
-						<li>Example 1: If <code>random_length = 8</code>, a flag could be: <code>CTF{a1b2c3d4}</code>
-						</li>
-						<li>Example 2: The random part can be appended to a predefined flag:
-							<code>CTF{this_is_the_flag_a1b2c3d4}</code>
-						</li>
-						<li>You provide:
-							<ul>
-								<li><strong>Prefix:</strong> <code>CTF{</code></li>
-								<li><strong>Suffix:</strong> <code>}</code></li>
-								<li><strong>Random Length:</strong> <code>8</code></li>
-							</ul>
-						</li>
+						<li><code>&lt;ran_8&gt;</code> will be replaced with 8 random characters</li>
+						<li><code>&lt;ran_16&gt;</code> for 16 characters, etc.</li>
 					</ul>
 				</li>
 			</ul>
-			With this type of challenge, you don't need to specify flag in the popup (just leave empty)!
+			<em>Note: You don't need to manually add flags in the flag popup!</em>
 		</small>
 	</label>
-	<select class="form-control" name="flag_mode" id="flag_mode">
-		<option value="static" {% if challenge.flag_mode=="static" %}selected{% endif %}>
-			Static
-		</option>
-		<option value="random" {% if challenge.flag_mode=="random" %}selected{% endif %}>
-			Random
-		</option>
-	</select>
+	<input type="text" class="form-control" id="flag_pattern" placeholder="CTF{example_flag}" />
+	<small id="flag_pattern_preview" class="form-text text-info"></small>
 </div>
 
-<div class="form-group">
-	<label for="flag_prefix">Flag Prefix</label>
-	<input type="text" class="form-control" name="flag_prefix" id="flag_prefix"
-		value="{{ challenge.flag_prefix|default('CTF{') }}" />
-</div>
+<script>
+	// Build flag pattern from existing values
+	document.addEventListener('DOMContentLoaded', function() {
+		const mode = "{{ challenge.flag_mode|default('static') }}";
+		const prefix = "{{ challenge.flag_prefix|default('CTF{') }}";
+		const suffix = "{{ challenge.flag_suffix|default('}') }}";
+		const length = {{ challenge.random_flag_length|default(10) }};
+		
+		let pattern = '';
+		if (mode === 'random' && length > 0) {
+			pattern = prefix + '<ran_' + length + '>' + suffix;
+		} else {
+			pattern = prefix + suffix;
+		}
+		
+		document.getElementById('flag_pattern').value = pattern;
+	});
+</script>
 
-<div class="form-group">
-	<label for="flag_suffix">Flag Suffix</label>
-	<input type="text" class="form-control" name="flag_suffix" id="flag_suffix"
-		value="{{ challenge.flag_suffix|default('}') }}" />
-</div>
-
-<div class="form-group">
-	<label for="random_flag_length">Random Flag Length</label>
-	<input type="number" class="form-control" name="random_flag_length" id="random_flag_length" min="1"
-		value="{{ challenge.random_flag_length|default(10) }}" />
-</div>
+<!-- Hidden fields (auto-filled by JavaScript) -->
+<input type="hidden" id="flag_mode" name="flag_mode" value="{{ challenge.flag_mode|default('static') }}" />
+<input type="hidden" id="flag_prefix" name="flag_prefix" value="{{ challenge.flag_prefix|default('CTF{') }}" />
+<input type="hidden" id="flag_suffix" name="flag_suffix" value="{{ challenge.flag_suffix|default('}') }}" />
+<input type="hidden" id="random_flag_length" name="random_flag_length" value="{{ challenge.random_flag_length|default(0) }}" />
 
 {% endblock %}

@@ -73,7 +73,8 @@ class ContainerService:
             self.stop_instance(existing, user_id, reason='expired')
         
         # 5. Create instance record (status=pending)
-        expires_at = datetime.utcnow() + timedelta(minutes=challenge.timeout_minutes)
+        # Set expiration based on global timeout setting
+        expires_at = datetime.utcnow() + timedelta(minutes=challenge.get_timeout_minutes())
         
         # Generate flag
         flag_plaintext = self.flag_service.generate_flag(challenge)
@@ -153,8 +154,8 @@ class ContainerService:
                 host_port=host_port,
                 command=command,
                 environment={'FLAG': flag},
-                memory_limit=challenge.memory_limit,
-                cpu_limit=challenge.cpu_limit,
+                memory_limit=challenge.get_memory_limit(),
+                cpu_limit=challenge.get_cpu_limit(),
                 pids_limit=challenge.pids_limit,
                 labels={
                     'ctfd.instance_uuid': instance.uuid,
@@ -212,11 +213,13 @@ class ContainerService:
         challenge = ContainerChallenge.query.get(instance.challenge_id)
         
         # Check renewal limit
-        if instance.renewal_count >= challenge.max_renewals:
-            raise Exception(f"Maximum renewals ({challenge.max_renewals}) reached")
+        max_renewals = challenge.get_max_renewals()
+        if instance.renewal_count >= max_renewals:
+            raise Exception(f"Maximum renewals ({max_renewals}) reached")
         
         # Extend expiration
-        instance.extend_expiration(challenge.timeout_minutes)
+        timeout_minutes = challenge.get_timeout_minutes()
+        instance.extend_expiration(timeout_minutes)
         instance.last_accessed_at = datetime.utcnow()
         
         db.session.commit()

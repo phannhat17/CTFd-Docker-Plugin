@@ -34,14 +34,36 @@ class ContainerChallenge(Challenges):
         name="connection_info"
     )  # Extra info to display
     
-    # Resource limits
-    memory_limit = db.Column(db.String(20), default="512m")  # e.g., "512m", "1g"
-    cpu_limit = db.Column(db.Float, default=0.5)  # e.g., 0.5 = 50% of one core
+    # Resource limits (deprecated - use global config)
+    # Kept for backward compatibility, but values are ignored
+    memory_limit = db.Column(db.String(20), nullable=True)
+    cpu_limit = db.Column(db.Float, nullable=True)
     pids_limit = db.Column(db.Integer, default=100)
     
-    # Container lifecycle
-    timeout_minutes = db.Column(db.Integer, default=60)  # Container auto-expire after N minutes
-    max_renewals = db.Column(db.Integer, default=3)  # Maximum number of renewals
+    # Container lifecycle (deprecated - use global config)
+    # Kept for backward compatibility, but values are ignored
+    timeout_minutes = db.Column(db.Integer, nullable=True)
+    max_renewals = db.Column(db.Integer, nullable=True)
+    
+    def get_timeout_minutes(self):
+        """Get timeout from global config"""
+        from ..models.config import ContainerConfig
+        return int(ContainerConfig.get('default_timeout', '60'))
+    
+    def get_max_renewals(self):
+        """Get max renewals from global config"""
+        from ..models.config import ContainerConfig
+        return int(ContainerConfig.get('max_renewals', '3'))
+    
+    def get_memory_limit(self):
+        """Get memory limit from global config"""
+        from ..models.config import ContainerConfig
+        return ContainerConfig.get('max_memory', '512m')
+    
+    def get_cpu_limit(self):
+        """Get CPU limit from global config"""
+        from ..models.config import ContainerConfig
+        return float(ContainerConfig.get('max_cpu', '0.5'))
     
     # Flag configuration
     flag_mode = db.Column(
@@ -56,6 +78,7 @@ class ContainerChallenge(Challenges):
     container_initial = db.Column(db.Integer, default=500, name="initial")
     container_minimum = db.Column(db.Integer, default=100, name="minimum")
     container_decay = db.Column(db.Integer, default=20, name="decay")
+    decay_function = db.Column(db.String(32), default="logarithmic")  # linear or logarithmic
     
     def __init__(self, *args, **kwargs):
         super(ContainerChallenge, self).__init__(**kwargs)

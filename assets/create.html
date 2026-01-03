@@ -8,30 +8,78 @@
 
 {% block value %}
 <div class="form-group">
-	<label for="value">Initial Value<br>
+	<label for="scoring_type">Scoring Type<br>
 		<small class="form-text text-muted">
-			This is how many points the challenge is worth initially.
+			Choose between static points or dynamic decay scoring
 		</small>
 	</label>
-	<input type="number" class="form-control" name="initial" placeholder="Enter value" required>
+	<select class="form-control" id="scoring_type" name="scoring_type">
+		<option value="standard" selected>Standard (Fixed Points)</option>
+		<option value="dynamic">Dynamic (Decay-based)</option>
+	</select>
 </div>
 
-<div class="form-group">
-	<label for="value">Decay Limit<br>
-		<small class="form-text text-muted">
-			The amount of solves before the challenge reaches its minimum value
-		</small>
-	</label>
-	<input type="number" class="form-control" name="decay" placeholder="Enter decay limit" required>
+<!-- Standard Scoring (shown by default) -->
+<div id="standard-scoring" class="scoring-section">
+	<div class="form-group">
+		<label for="value">Points<br>
+			<small class="form-text text-muted">
+				Fixed number of points for this challenge
+			</small>
+		</label>
+		<input type="number" class="form-control" name="value" id="standard_value" placeholder="Enter value" required>
+	</div>
 </div>
 
-<div class="form-group">
-	<label for="value">Minimum Value<br>
-		<small class="form-text text-muted">
-			This is the lowest that the challenge can be worth
-		</small>
-	</label>
-	<input type="number" class="form-control" name="minimum" placeholder="Enter minimum value" required>
+<!-- Dynamic Scoring (hidden by default) -->
+<div id="dynamic-scoring" class="scoring-section" style="display: none;">
+	<div class="form-group">
+		<label for="initial">Initial Value<br>
+			<small class="form-text text-muted">
+				This is how many points the challenge is worth initially
+			</small>
+		</label>
+		<input type="number" class="form-control" name="initial" id="dynamic_initial" placeholder="Enter initial value">
+	</div>
+
+	<div class="form-group">
+		<label for="value">Decay Function<br>
+			<small class="form-text text-muted">
+				<span>How the dynamic value will be calculated based on the Decay value</span>
+				<ul>
+					<li>Linear: Calculated as <code>Initial - (Decay * SolveCount)</code></li>
+					<li>Logarithmic: Calculated as <code>(((Minimum - Initial) / (Decay^2)) * (SolveCount^2)) + Initial</code></li>
+				</ul>
+			</small>
+		</label>
+		<select class="form-control" name="decay_function" id="decay_function">
+			<option value="linear" selected>Linear</option>
+			<option value="logarithmic">Logarithmic</option>
+		</select>
+	</div>
+
+	<div class="form-group">
+		<label for="value">Decay<br>
+			<small class="form-text text-muted">
+				<span>The decay value is used differently depending on the above Decay Function</span>
+				<ul>
+					<li>Linear: The amount of points deducted per solve. Equal deduction per solve.</li>
+					<li>Logarithmic: The amount of solves before the challenge reaches its minimum value. Earlier solves will lose less
+						points. Later solves will lose more points</li>
+				</ul>
+			</small>
+		</label>
+		<input type="number" class="form-control" name="decay" id="dynamic_decay" placeholder="Enter decay limit">
+	</div>
+
+	<div class="form-group">
+		<label for="minimum">Minimum Value<br>
+			<small class="form-text text-muted">
+				This is the lowest that the challenge can be worth
+			</small>
+		</label>
+		<input type="number" class="form-control" name="minimum" id="dynamic_minimum" placeholder="Enter minimum value">
+	</div>
 </div>
 
 <div class="form-group">
@@ -83,106 +131,32 @@
 	<input type="text" class="form-control" name="command" placeholder="/bin/bash -c 'your command'">
 </div>
 
+<!-- Flag Pattern Configuration -->
 <div class="form-group">
-	<label>
-		Container Timeout (minutes)<br>
+	<label for="flag_pattern">Flag Pattern<br>
 		<small class="form-text text-muted">
-			How long containers will run before auto-termination (uses global setting by default)
-		</small>
-	</label>
-	<input type="number" class="form-control" name="timeout_minutes" placeholder="60">
-</div>
-
-<div class="form-group">
-	<label>
-		Max Renewals<br>
-		<small class="form-text text-muted">
-			Maximum number of times users can extend container lifetime (uses global setting by default)
-		</small>
-	</label>
-	<input type="number" class="form-control" name="max_renewals" placeholder="3">
-</div>
-
-<div class="form-group">
-	<label>
-		Memory Limit<br>
-		<small class="form-text text-muted">
-			Maximum memory per container (e.g., 512m, 1g, uses global setting by default)
-		</small>
-	</label>
-	<input type="text" class="form-control" name="memory_limit" placeholder="512m">
-</div>
-
-<div class="form-group">
-	<label>
-		CPU Limit<br>
-		<small class="form-text text-muted">
-			Maximum CPU cores per container (e.g., 0.5 = 50% of one core, uses global setting by default)
-		</small>
-	</label>
-	<input type="number" step="0.1" class="form-control" name="cpu_limit" placeholder="0.5">
-</div>
-<!-- Flag Mode, Prefix, Suffix, and Random Length -->
-<div class="form-group">
-	<label for="flag_mode">Flag Mode<br><small class="form-text text-muted">
+			<strong>Easy flag configuration! Just enter your flag pattern:</strong>
 			<ul>
-				<li><strong>Static Mode:</strong>
+				<li><strong>Static flag:</strong> <code>CTF{this_is_the_flag}</code> → Same flag for everyone</li>
+				<li><strong>Random flag:</strong> <code>CTF{this_is_the_flag_&lt;ran_8&gt;}</code> → Unique flag per team/user
 					<ul>
-						<li>The flag follows a fixed format:
-							<code>&lt;prefix&gt; + &lt;flag content&gt; + &lt;suffix&gt;</code>
-						</li>
-						<li>Example: If your flag is <code>CTF{this_is_the_flag}</code>, you provide:
-							<ul>
-								<li><strong>Prefix:</strong> <code>CTF{this_is_the_flag</code></li>
-								<li><strong>Suffix:</strong> <code>}</code></li>
-								<li><strong>Random Length:</strong> Leave as default</li>
-							</ul>
-						</li>
-					</ul>
-				</li>
-				<li><strong>Random Mode:</strong>
-					<ul>
-						<li>The flag follows the format:
-							<code>&lt;prefix&gt; + &lt;random part (length defined)&gt; + &lt;suffix&gt;</code>
-						</li>
-						<li>Example 1: If <code>random_length = 8</code>, a flag could be: <code>CTF{a1b2c3d4}</code>
-						</li>
-						<li>Example 2: The random part can be appended to a predefined flag:
-							<code>CTF{this_is_the_flag_a1b2c3d4}</code>
-						</li>
-						<li>You provide:
-							<ul>
-								<li><strong>Prefix:</strong> <code>CTF{</code></li>
-								<li><strong>Suffix:</strong> <code>}</code></li>
-								<li><strong>Random Length:</strong> <code>8</code></li>
-							</ul>
-						</li>
+						<li><code>&lt;ran_8&gt;</code> will be replaced with 8 random characters</li>
+						<li><code>&lt;ran_16&gt;</code> for 16 characters, etc.</li>
 					</ul>
 				</li>
 			</ul>
-			With this type of challenge, you don't need to specify flag in the popup (just leave empty)!
+			<em>Note: You don't need to manually add flags in the flag popup!</em>
 		</small>
 	</label>
-	<select class="form-control" id="flag_mode" name="flag_mode">
-		<option value="static">Static</option>
-		<option value="random">Random</option>
-	</select>
+	<input type="text" class="form-control" id="flag_pattern" placeholder="CTF{example_flag}" value="CTF{}" />
+	<small id="flag_pattern_preview" class="form-text text-info"></small>
 </div>
 
-<div class="form-group">
-	<label for="flag_prefix">Flag Prefix</label>
-	<input type="text" class="form-control" id="flag_prefix" name="flag_prefix" placeholder="CTF{" value="CTF{" />
-</div>
-
-<div class="form-group">
-	<label for="flag_suffix">Flag Suffix</label>
-	<input type="text" class="form-control" id="flag_suffix" name="flag_suffix" placeholder="}" value="}" />
-</div>
-
-<div class="form-group">
-	<label for="random_flag_length">Random Flag Length (Leave as default at static mode)</label>
-	<input type="number" class="form-control" id="random_flag_length" name="random_flag_length" min="1" value="10" />
-</div>
+<!-- Hidden fields (auto-filled by JavaScript) -->
+<input type="hidden" id="flag_mode" name="flag_mode" value="static" />
+<input type="hidden" id="flag_prefix" name="flag_prefix" value="CTF{" />
+<input type="hidden" id="flag_suffix" name="flag_suffix" value="}" />
+<input type="hidden" id="random_flag_length" name="random_flag_length" value="0" />
 
 {% endblock %}
 

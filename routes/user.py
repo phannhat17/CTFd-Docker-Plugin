@@ -111,9 +111,9 @@ def request_container():
                     'type': existing.connection_info.get('type') if existing.connection_info else 'ssh',
                     'info': existing.connection_info.get('info') if existing.connection_info else ''
                 },
-                'expires_at': existing.expires_at.isoformat(),
+                'expires_at': int(existing.expires_at.timestamp() * 1000),
                 'renewal_count': existing.renewal_count,
-                'max_renewals': challenge.max_renewals
+                'max_renewals': challenge.get_max_renewals()
             })
         
         # Create new instance
@@ -132,9 +132,9 @@ def request_container():
                 'type': instance.connection_info.get('type') if instance.connection_info else 'ssh',
                 'info': instance.connection_info.get('info') if instance.connection_info else ''
             },
-            'expires_at': instance.expires_at.isoformat(),
+            'expires_at': int(instance.expires_at.timestamp() * 1000),
             'renewal_count': instance.renewal_count,
-            'max_renewals': challenge.max_renewals
+            'max_renewals': challenge.get_max_renewals()
         })
         
     except Exception as e:
@@ -182,7 +182,7 @@ def get_container_info(challenge_id):
                 'type': instance.connection_info.get('type') if instance.connection_info else 'ssh',
                 'info': instance.connection_info.get('info') if instance.connection_info else ''
             },
-            'expires_at': instance.expires_at.isoformat(),
+            'expires_at': int(instance.expires_at.timestamp() * 1000),
             'renewal_count': instance.renewal_count
         })
         
@@ -234,7 +234,7 @@ def renew_container():
         
         return jsonify({
             'success': True,
-            'expires_at': instance.expires_at.isoformat(),
+            'expires_at': int(instance.expires_at.timestamp() * 1000),
             'renewal_count': instance.renewal_count
         })
         

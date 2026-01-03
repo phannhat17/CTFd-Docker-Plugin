@@ -88,11 +88,23 @@ function calculateExpiry(date) {
     return Math.ceil((new Date(date * 1000) - new Date()) / 1000 / 60);
 }
 
+function formatExpiry(timestampMs) {
+    const secondsLeft = Math.ceil((timestampMs - Date.now()) / 1000);
+    if (secondsLeft < 0) {
+        return "Expired";
+    } else if (secondsLeft < 60) {
+        return "Expires in " + secondsLeft + " seconds";
+    } else {
+        const minutesLeft = Math.ceil(secondsLeft / 60);
+        return "Expires in " + minutesLeft + " minutes";
+    }
+}
+
 function createChallengeLinkElement(data, parent) {
     parent.innerHTML = "";
 
     let expires = document.createElement('span');
-    expires.textContent = "Expires in " + calculateExpiry(new Date(data.expires)) + " minutes.";
+    expires.textContent = formatExpiry(data.expires_at);
     parent.append(expires, document.createElement('br'));
 
     if (data.connect == "tcp") {
@@ -109,7 +121,7 @@ function createChallengeLinkElement(data, parent) {
 }
 
 function view_container_info(challenge_id) {
-    console.log("[Container] Fetching info for challenge", challenge_id);
+    // console.log("[Container] Fetching info for challenge", challenge_id);
     let alert = resetAlert();
 
     fetch("/api/v1/containers/info/" + challenge_id, {
@@ -121,7 +133,7 @@ function view_container_info(challenge_id) {
     })
     .then(response => response.json())
     .then(data => {
-        console.log("[Container] Info response:", data);
+        // console.log("[Container] Info response:", data);
         alert.innerHTML = ""; // Remove spinner
         
         if (data.status == "not_found") {
@@ -131,8 +143,7 @@ function view_container_info(challenge_id) {
         } else if (data.status == "running" || data.status == "provisioning") {
             // Show connection info
             let expires = document.createElement('span');
-            let minutesLeft = Math.ceil((new Date(data.expires_at) - new Date()) / 1000 / 60);
-            expires.textContent = "Expires in " + minutesLeft + " minutes.";
+            expires.textContent = formatExpiry(data.expires_at);
             alert.append(expires, document.createElement('br'));
 
             // Display connection info based on type
@@ -208,8 +219,7 @@ function container_request(challenge_id) {
         } else {
             // Show connection info
             let expires = document.createElement('span');
-            let minutesLeft = Math.ceil((new Date(data.expires_at) - new Date()) / 1000 / 60);
-            expires.textContent = "Expires in " + minutesLeft + " minutes.";
+            expires.textContent = formatExpiry(data.expires_at);
             alert.append(expires, document.createElement('br'));
 
             // Display connection info based on type
@@ -322,21 +332,21 @@ function container_stop(challenge_id) {
 
 // Initialize: Inject UI elements if template doesn't load
 (function() {
-    console.log("[Container] Initializing - checking for template render");
+    // console.log("[Container] Initializing - checking for template render");
     
     let checkCount = 0;
     const maxChecks = 20;
     
     function checkAndInject() {
         checkCount++;
-        console.log(`[Container] Check #${checkCount}: Looking for deployment-actions or challenge window`);
+        // console.log(`[Container] Check #${checkCount}: Looking for deployment-actions or challenge window`);
         
         // First check if our template loaded
         let deploymentDiv = document.querySelector('.deployment-actions');
         if (deploymentDiv) {
             const challengeId = deploymentDiv.getAttribute('data-challenge-id');
             if (challengeId) {
-                console.log("[Container] Template loaded! Challenge ID:", challengeId);
+                // console.log("[Container] Template loaded! Challenge ID:", challengeId);
                 view_container_info(parseInt(challengeId));
                 return true;
             }
@@ -347,7 +357,7 @@ function container_stop(challenge_id) {
         const challengeBody = challengeWindow ? challengeWindow.querySelector('.modal-body') : null;
         
         if (challengeBody && !document.querySelector('.deployment-actions-injected')) {
-            console.log("[Container] Template NOT loaded, injecting UI manually");
+            // console.log("[Container] Template NOT loaded, injecting UI manually");
             
             // Try multiple ways to get challenge ID
             let challengeId = null;
@@ -355,13 +365,13 @@ function container_stop(challenge_id) {
             // Method 1: From window.challenge
             if (window.challenge?.data?.id) {
                 challengeId = window.challenge.data.id;
-                console.log("[Container] Got challenge ID from window.challenge:", challengeId);
+                // console.log("[Container] Got challenge ID from window.challenge:", challengeId);
             }
             
             // Method 2: From CTFd internal store
             if (!challengeId && window.CTFd?._internal?.challenge?.data?.id) {
                 challengeId = window.CTFd._internal.challenge.data.id;
-                console.log("[Container] Got challenge ID from CTFd._internal:", challengeId);
+                // console.log("[Container] Got challenge ID from CTFd._internal:", challengeId);
             }
             
             // Method 3: From challenge-id input field
@@ -369,7 +379,7 @@ function container_stop(challenge_id) {
                 const challengeIdInput = document.getElementById('challenge-id');
                 if (challengeIdInput) {
                     challengeId = parseInt(challengeIdInput.value);
-                    console.log("[Container] Got challenge ID from input field:", challengeId);
+                    // console.log("[Container] Got challenge ID from input field:", challengeId);
                 }
             }
             
@@ -378,7 +388,7 @@ function container_stop(challenge_id) {
                 const titleElement = challengeWindow.querySelector('[data-challenge-id]');
                 if (titleElement) {
                     challengeId = parseInt(titleElement.getAttribute('data-challenge-id'));
-                    console.log("[Container] Got challenge ID from data attribute:", challengeId);
+                    // console.log("[Container] Got challenge ID from data attribute:", challengeId);
                 }
             }
             
@@ -391,7 +401,7 @@ function container_stop(challenge_id) {
                 return false;
             }
             
-            console.log("[Container] Using challenge ID:", challengeId);
+            // console.log("[Container] Using challenge ID:", challengeId);
             
             // Create container UI
             const containerDiv = document.createElement('div');
@@ -419,12 +429,12 @@ function container_stop(challenge_id) {
             const descSection = challengeBody.querySelector('.challenge-desc');
             if (descSection) {
                 descSection.after(containerDiv);
-                console.log("[Container] UI injected, calling view_container_info");
+                // console.log("[Container] UI injected, calling view_container_info");
                 view_container_info(challengeId);
                 return true;
             } else {
                 challengeBody.insertBefore(containerDiv, challengeBody.firstChild);
-                console.log("[Container] UI injected at top, calling view_container_info");
+                // console.log("[Container] UI injected at top, calling view_container_info");
                 view_container_info(challengeId);
                 return true;
             }
@@ -453,5 +463,5 @@ function container_stop(challenge_id) {
         subtree: true
     });
     
-    console.log("[Container] MutationObserver started");
+    // console.log("[Container] MutationObserver started");
 })();

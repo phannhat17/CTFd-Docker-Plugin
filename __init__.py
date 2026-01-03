@@ -84,9 +84,14 @@ class ContainerChallengeType(BaseChallenge):
             'connection_info': 'container_connection_info',
         }
         
-        # Map field names
+        # Fields to exclude (UI-only fields)
+        exclude_fields = {'scoring_type'}
+        
+        # Map field names and exclude UI-only fields
         mapped_data = {}
         for key, value in data.items():
+            if key in exclude_fields:
+                continue
             mapped_key = field_mapping.get(key, key)
             mapped_data[mapped_key] = value
         
@@ -181,7 +186,14 @@ class ContainerChallengeType(BaseChallenge):
             'connection_info': 'container_connection_info',
         }
         
+        # Fields to exclude (UI-only fields)
+        exclude_fields = {'scoring_type'}
+        
         for attr, value in data.items():
+            # Skip UI-only fields
+            if attr in exclude_fields:
+                continue
+            
             # Skip if empty
             if value == '':
                 continue
@@ -231,7 +243,11 @@ class ContainerChallengeType(BaseChallenge):
             request: Flask request
         """
         super().solve(user, team, challenge, request)
-        cls.calculate_value(challenge)
+        
+        # Only recalculate value for dynamic challenges
+        # Dynamic challenges have container_decay set
+        if challenge.container_decay and challenge.container_decay > 0:
+            cls.calculate_value(challenge)
     
     @classmethod
     def attempt(cls, challenge, request):
@@ -309,6 +325,9 @@ class ContainerChallengeType(BaseChallenge):
     def calculate_value(cls, challenge):
         """
         Calculate dynamic challenge value based on solves
+        Supports both linear and logarithmic decay functions
+        
+        Only applies to dynamic challenges (where container_decay > 0)
         
         Args:
             challenge: ContainerChallenge object
@@ -316,6 +335,14 @@ class ContainerChallengeType(BaseChallenge):
         Returns:
             Updated challenge
         """
+        # Skip if not a dynamic challenge
+        if not challenge.container_decay or challenge.container_decay == 0:
+            return challenge
+        
+        # Skip if missing required dynamic fields
+        if not challenge.container_initial or not challenge.container_minimum:
+            return challenge
+        
         Model = get_model()
         
         solve_count = (
@@ -332,11 +359,21 @@ class ContainerChallengeType(BaseChallenge):
         if solve_count != 0:
             solve_count -= 1
         
-        # Dynamic scoring formula
-        value = (
-            ((challenge.container_minimum - challenge.container_initial) / (challenge.container_decay ** 2))
-            * (solve_count ** 2)
-        ) + challenge.container_initial
+        # Get decay function (default to logarithmic for backward compatibility)
+        decay_func = getattr(challenge, 'decay_function', 'logarithmic')
+        
+        if decay_func == 'linear':
+            # Linear decay formula
+            value = challenge.container_initial - (challenge.container_decay * solve_count)
+        else:
+            # Logarithmic (parabolic) decay formula
+            # Handle division by zero
+            decay = challenge.container_decay if challenge.container_decay > 0 else 1
+            
+            value = (
+                ((challenge.container_minimum - challenge.container_initial) / (decay ** 2))
+                * (solve_count ** 2)
+            ) + challenge.container_initial
         
         value = math.ceil(value)
         
