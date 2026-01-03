@@ -39,15 +39,18 @@ class AntiCheatService:
         Returns:
             (is_correct: bool, message: str, is_cheating: bool)
         """
-        # 1. Hash submitted flag
+        # Get challenge to check flag mode
+        from ..models.challenge import ContainerChallenge
+        challenge = ContainerChallenge.query.get(challenge_id)
+        if not challenge:
+            return (False, "Challenge not found", False)
+        
+        # Hash submitted flag
         flag_hash = FlagService.hash_flag(submitted_flag)
         ip_address = request.remote_addr if request else None
         user_agent = request.headers.get('User-Agent') if request else None
         
-        # 2. Find flag in database
-        flag_record = ContainerFlag.query.filter_by(flag_hash=flag_hash).first()
-        
-        # 3. Create attempt log (always)
+        # Create attempt log (always)
         attempt = ContainerFlagAttempt(
             challenge_id=challenge_id,
             account_id=account_id,
@@ -57,7 +60,47 @@ class AntiCheatService:
             user_agent=user_agent
         )
         
-        # 4. Flag does not exist → wrong
+        # STATIC FLAG: Compare directly with challenge flag
+        if challenge.flag_mode == 'static':
+            static_flag = f"{challenge.flag_prefix}{challenge.flag_suffix}"
+            
+            if submitted_flag == static_flag:
+                # Correct static flag
+                attempt.is_correct = True
+                attempt.is_cheating = False
+                
+                # Audit log
+                audit_log = ContainerAuditLog(
+                    event_type='flag_submitted_correct',
+                    challenge_id=challenge_id,
+                    account_id=account_id,
+                    user_id=user_id,
+                    details={'flag_mode': 'static', 'ip_address': ip_address},
+                    severity='info',
+                    ip_address=ip_address,
+                    user_agent=user_agent
+                )
+                
+                db.session.add(attempt)
+                db.session.add(audit_log)
+                db.session.commit()
+                
+                logger.info(f"Account {account_id} correctly submitted static flag for challenge {challenge_id}")
+                return (True, "Correct", False)
+            else:
+                # Wrong static flag
+                attempt.is_correct = False
+                attempt.is_cheating = False
+                db.session.add(attempt)
+                db.session.commit()
+                
+                logger.info(f"Account {account_id} submitted incorrect static flag for challenge {challenge_id}")
+                return (False, "Incorrect", False)
+        
+        # RANDOM FLAG: Check in database
+        flag_record = ContainerFlag.query.filter_by(flag_hash=flag_hash).first()
+        
+        # Flag does not exist → wrong
         if not flag_record:
             attempt.is_correct = False
             attempt.is_cheating = False
