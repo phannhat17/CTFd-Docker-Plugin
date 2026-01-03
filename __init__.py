@@ -392,6 +392,7 @@ flag_service = None
 container_service = None
 anticheat_service = None
 port_manager = None
+redis_expiration_service = None
 
 
 def load(app: Flask):
@@ -401,7 +402,7 @@ def load(app: Flask):
     Args:
         app: Flask app instance
     """
-    global docker_service, flag_service, container_service, anticheat_service, port_manager
+    global docker_service, flag_service, container_service, anticheat_service, port_manager, redis_expiration_service
     
     logger.info("Loading Container Challenge Plugin")
     
@@ -441,6 +442,15 @@ def load(app: Flask):
     # Anticheat service
     anticheat_service = AntiCheatService(flag_service)
     logger.info("Anticheat service initialized")
+    
+    # Redis expiration service (for accurate container killing)
+    from .services import RedisExpirationService
+    redis_expiration_service = RedisExpirationService(
+        app=app,
+        container_service_getter=lambda: container_service
+    )
+    redis_expiration_service.start_listener()
+    logger.info("Redis expiration service initialized and listener started")
     
     # Register challenge type
     CHALLENGE_CLASSES["container"] = ContainerChallengeType

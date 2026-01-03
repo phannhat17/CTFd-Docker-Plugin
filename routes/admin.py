@@ -12,6 +12,19 @@ from ..models.config import ContainerConfig
 
 admin_bp = Blueprint('containers_admin', __name__, url_prefix='/admin/containers')
 
+# Template filters
+@admin_bp.app_template_filter('get_user')
+def get_user_filter(user_id):
+    """Get user by ID"""
+    from CTFd.models import Users
+    return Users.query.filter_by(id=user_id).first()
+
+@admin_bp.app_template_filter('get_team')
+def get_team_filter(team_id):
+    """Get team by ID"""
+    from CTFd.models import Teams
+    return Teams.query.filter_by(id=team_id).first()
+
 # Global services
 docker_service = None
 container_service = None
@@ -61,6 +74,9 @@ def _get_docker_status():
 @admins_only
 def dashboard():
     """Admin dashboard - overview of all containers"""
+    from CTFd.utils import get_config
+    from CTFd.models import Users, Teams
+    
     # Fetch instances grouped by status
     running_instances = ContainerInstance.query.filter_by(status='running').order_by(ContainerInstance.created_at.desc()).all()
     provisioning_instances = ContainerInstance.query.filter_by(status='provisioning').order_by(ContainerInstance.created_at.desc()).all()
@@ -75,6 +91,9 @@ def dashboard():
     # Get Docker status
     connected, docker_info = _get_docker_status()
     
+    # Check if teams mode
+    is_teams_mode = get_config('user_mode') == 'teams'
+    
     return render_template('container_dashboard.html',
                          running_instances=running_instances,
                          provisioning_instances=provisioning_instances,
@@ -85,6 +104,7 @@ def dashboard():
                          total_count=total_count,
                          connected=connected,
                          docker_info=docker_info,
+                         is_teams_mode=is_teams_mode,
                          active_page='dashboard')
 
 

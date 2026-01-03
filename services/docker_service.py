@@ -57,7 +57,8 @@ class DockerService:
         memory_limit: str = "512m",
         cpu_limit: float = 0.5,
         pids_limit: int = 100,
-        labels: Dict[str, str] = None
+        labels: Dict[str, str] = None,
+        name: str = None
     ) -> Dict[str, Any]:
         """
         Create and start a container
@@ -72,6 +73,7 @@ class DockerService:
             cpu_limit: CPU limit (0.5 = 50% of one core)
             pids_limit: Max number of processes
             labels: Labels for the container
+            name: Container name (optional)
         
         Returns:
             {
@@ -98,6 +100,7 @@ class DockerService:
             # Create container
             container = self.client.containers.run(
                 image=image,
+                name=name,
                 command=command,
                 detach=True,
                 auto_remove=False,  # Don't auto remove to be able to inspect logs

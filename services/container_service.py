@@ -25,6 +25,7 @@ class ContainerService:
         self.docker = docker_service
         self.flag_service = flag_service
         self.port_manager = port_manager
+        self._cleanup_running = False  # Prevent overlapping cleanup jobs
     
     def create_instance(self, challenge_id: int, account_id: int, user_id: int) -> ContainerInstance:
         """
@@ -143,6 +144,12 @@ class ContainerService:
             connection_host = ContainerConfig.get('connection_host', 'localhost')
             
             # 3. Create Docker container
+            # Generate container name: challengename_accountid
+            import re
+            # Sanitize challenge name (only alphanumeric and hyphens)
+            safe_name = re.sub(r'[^a-zA-Z0-9-]', '', challenge.name.replace(' ', '-').lower())
+            container_name = f"{safe_name}_{instance.account_id}"
+            
             # Replace {FLAG} placeholder in command if present
             command = challenge.command if challenge.command else None
             if command and '{FLAG}' in command:
@@ -157,6 +164,7 @@ class ContainerService:
                 memory_limit=challenge.get_memory_limit(),
                 cpu_limit=challenge.get_cpu_limit(),
                 pids_limit=challenge.pids_limit,
+                name=container_name,
                 labels={
                     'ctfd.instance_uuid': instance.uuid,
                     'ctfd.challenge_id': str(challenge.id),
@@ -177,6 +185,18 @@ class ContainerService:
             instance.started_at = datetime.utcnow()
             
             db.session.commit()
+            
+            # 5. Schedule expiration in Redis (for accurate killing)
+            try:
+                from .. import redis_expiration_service
+                if redis_expiration_service:
+                    expires_in_seconds = int((instance.expires_at - datetime.utcnow()).total_seconds())
+                    redis_expiration_service.schedule_expiration(
+                        instance.uuid,
+                        expires_in_seconds
+                    )
+            except Exception as e:
+                logger.warning(f"Failed to schedule Redis expiration: {e}")
             
             logger.info(f"Provisioned container {result['container_id'][:12]} for instance {instance.uuid}")
             
@@ -217,12 +237,23 @@ class ContainerService:
         if instance.renewal_count >= max_renewals:
             raise Exception(f"Maximum renewals ({max_renewals}) reached")
         
-        # Extend expiration
-        timeout_minutes = challenge.get_timeout_minutes()
-        instance.extend_expiration(timeout_minutes)
+        # Extend expiration by 5 minutes (fixed)
+        extend_minutes = 5
+        instance.extend_expiration(extend_minutes)
         instance.last_accessed_at = datetime.utcnow()
         
         db.session.commit()
+        
+        # Extend Redis TTL
+        try:
+            from .. import redis_expiration_service
+            if redis_expiration_service:
+                redis_expiration_service.extend_expiration(
+                    instance.uuid,
+                    extend_minutes * 60  # 5 minutes = 300 seconds
+                )
+        except Exception as e:
+            logger.warning(f"Failed to extend Redis expiration: {e}")
         
         # Audit log
         self._create_audit_log(
@@ -258,6 +289,14 @@ class ContainerService:
         
         instance.status = 'stopping'
         db.session.commit()
+        
+        # Cancel Redis expiration
+        try:
+            from .. import redis_expiration_service
+            if redis_expiration_service:
+                redis_expiration_service.cancel_expiration(instance.uuid)
+        except Exception as e:
+            logger.warning(f"Failed to cancel Redis expiration: {e}")
         
         try:
             # Stop Docker container
@@ -317,18 +356,74 @@ class ContainerService:
     def cleanup_expired_instances(self):
         """
         Background job: Cleanup expired instances
-        """
-        expired = ContainerInstance.query.filter(
-            ContainerInstance.status == 'running',
-            ContainerInstance.expires_at < datetime.utcnow()
-        ).all()
         
-        for instance in expired:
-            logger.info(f"Cleaning up expired instance {instance.uuid}")
-            try:
-                self.stop_instance(instance, user_id=None, reason='expired')
-            except Exception as e:
-                logger.error(f"Error cleaning up instance {instance.uuid}: {e}")
+        Optimized for high volume (100+ containers):
+        - Prevent overlapping runs
+        - Batch processing (max 50 per run)
+        - Timeout per container
+        - Continue on error
+        """
+        # Prevent overlapping cleanup jobs
+        if self._cleanup_running:
+            logger.warning("Cleanup job already running, skipping this run")
+            return
+        
+        self._cleanup_running = True
+        
+        try:
+            import signal
+            from contextlib import contextmanager
+            
+            @contextmanager
+            def timeout(seconds):
+                """Timeout context manager"""
+                def timeout_handler(signum, frame):
+                    raise TimeoutError(f"Operation timed out after {seconds}s")
+                
+                # Set alarm (Unix only)
+                old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+                signal.alarm(seconds)
+                try:
+                    yield
+                finally:
+                    signal.alarm(0)
+                    signal.signal(signal.SIGALRM, old_handler)
+            
+            # Get expired instances (limit to 50 per run to prevent overload)
+            expired = ContainerInstance.query.filter(
+                ContainerInstance.status == 'running',
+                ContainerInstance.expires_at < datetime.utcnow()
+            ).limit(50).all()
+            
+            if not expired:
+                return
+            
+            logger.warning(f"⚠️ [APSCHEDULER CLEANUP] Found {len(expired)} expired instances (Redis backup cleanup)")
+            
+            cleaned = 0
+            failed = 0
+            
+            for instance in expired:
+                try:
+                    # Timeout after 10 seconds per container
+                    with timeout(10):
+                        logger.warning(f"🟡 [APSCHEDULER KILL] Cleaning up expired instance {instance.uuid}")
+                        self.stop_instance(instance, user_id=None, reason='expired')
+                        cleaned += 1
+                except TimeoutError:
+                    logger.error(f"Timeout cleaning up instance {instance.uuid}")
+                    # Mark as error so it gets cleaned up later
+                    instance.status = 'error'
+                    db.session.commit()
+                    failed += 1
+                except Exception as e:
+                    logger.error(f"Error cleaning up instance {instance.uuid}: {e}")
+                    failed += 1
+            
+            logger.info(f"Cleanup completed: {cleaned} cleaned, {failed} failed")
+        
+        finally:
+            self._cleanup_running = False
     
     def cleanup_old_instances(self):
         """
