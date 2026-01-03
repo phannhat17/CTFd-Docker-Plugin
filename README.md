@@ -4,35 +4,36 @@ A comprehensive CTFd plugin that enables dynamic Docker container challenges wit
 
 ## Features
 
-### 🐳 Container Management
+### Container Management
 - **Dynamic Container Spawning**: Each team/user gets their own isolated Docker container
 - **Automatic Lifecycle Management**: Containers auto-expire after configurable timeout
 - **Resource Control**: Global limits for CPU, memory, and process count
 - **Port Management**: Automatic port allocation and mapping
 - **Custom Naming**: Containers named as `challengename_accountid` for easy identification
 
-### 🚨 Anti-Cheat System
+### Anti-Cheat System
 - **Flag Reuse Detection**: Automatically detects when teams share flags
 - **Instant Ban**: Both flag owner and submitter get banned immediately
+- **Audit Logging**: Complete trail of all container and flag activities
 - **Cheat Dashboard**: Admin view of all detected cheating attempts
 
-### 🎯 Scoring Options
+### Scoring Options
 - **Standard Scoring**: Fixed points per challenge
 - **Dynamic Scoring**: Points decay as more teams solve
   - Linear decay: `value = initial - (decay × solves)`
   - Logarithmic decay: Parabolic curve with minimum floor
 
-### 🔐 Flag Generation
+### Flag Generation
 - **Static Flags**: Same flag for all teams (e.g., `CTF{static_flag}`)
 - **Random Flags**: Unique per-team flags with pattern (e.g., `CTF{this_is_the_flag_<ran_8>}` -> `CTF{this_is_the_flag_xxxxxxxx}`)
 - **Automatic Preview**: Real-time flag pattern preview during challenge creation
 
-### 📊 Bulk Import
+### Bulk Import
 - **CSV Import**: Import multiple challenges at once
 - **Format Validation**: Automatic parsing and error reporting
 - **Progress Tracking**: Real-time feedback during import
 
-### ⚡ Performance
+### Performance
 - **Redis-Based Expiration**: Precise container killing (0-second accuracy)
 - **Efficient Port Management**: Thread-safe port allocation
 - **Database Optimization**: Indexed queries for fast lookups
@@ -194,6 +195,29 @@ Built for CTFd 3.8+ with modern CTF competition requirements in mind.
 - Bulk import capabilities
 - Real-time admin dashboard
 - Redis-based precision timing
+
+## Roadmap
+
+### Version 1.1
+- [ ] UI/UX improvements
+  - Enhanced challenge creation interface
+  - Improved container status visualizations
+  - Better mobile responsiveness
+- [ ] Admin dashboard enhancements
+  - Advanced filtering and search
+  - Monitor container logs
+  - Container resource usage graphs
+
+### Version 2.0
+- [ ] Remote Docker connection support
+  - Docker HTTP API support (TCP connection)
+  - Docker agent for remote host management
+  - Multi-host
+  - Secure TLS certificate authentication
+- [ ] Additional features
+  - Container shell access from web UI
+  - Container snapshot/backup functionality
+  - Enhanced audit logging with filters
 
 ## License
 
