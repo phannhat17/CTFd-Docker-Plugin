@@ -51,9 +51,41 @@ A comprehensive CTFd plugin that enables dynamic Docker container challenges wit
 4. **Enable Redis keyspace notifications:**
 ```yaml
 # In docker-compose.yml
-cache:
-  command: redis-server --notify-keyspace-events Ex --appendonly yes
+   cache:
+      command: redis-server --notify-keyspace-events Ex --appendonly yes
 ```
+
+## Security Considerations
+
+### ⚠️ CRITICAL: Cookie Theft Prevention - Reported by [j0r1an](https://jorianwoltjer.com/)
+
+**DO NOT host challenges on the same domain as your CTFd platform.**
+
+#### Vulnerable Configuration ❌
+```
+CTFd Platform:        ctf.example.com
+Challenge Containers: ctf.example.com:30000, ctf.example.com:30001, etc.
+```
+
+**Why this is dangerous:**
+- Browsers send cookies to ALL ports on the same domain
+- If any challenge has an RCE vulnerability, attacker controls that port
+- Attacker can steal CTFd session cookies from victims who visit the malicious challenge
+- Result: Complete account takeover via session hijacking
+
+#### Secure Configuration ✅
+```
+CTFd Platform:        ctf.example.com
+Challenge Containers: challenges.example.com:30000  (separate subdomain)
+                      OR 203.0.113.10:30000         (separate IP)
+                      OR challenges-ctf.org:30000   (separate domain)
+```
+
+**Why this is secure:**
+- Cookies are NOT shared between different domains/subdomains
+- Even with RCE, attacker cannot access CTFd session cookies
+- Users remain protected from session hijacking
+
 
 ## Configuration
 
@@ -61,6 +93,7 @@ Access admin panel: **Admin → Containers → Settings**
 
 ### Global Settings
 - **Docker Socket Path**: Default `/var/run/docker.sock`
+- **Connection Hostname**: **CRITICAL - Set to separate domain/IP** (see Security above)
 - **Container Timeout**: Minutes before auto-expiration (default: 60)
 - **Max Renewals**: How many times users can extend (default: 3)
 - **Port Range**: Starting port for container mapping (default: 30000)

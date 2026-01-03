@@ -5,8 +5,16 @@
 {% endblock %}
 
 {% block panel %}
+	<div class="alert alert-danger mb-3">
+		<i class="fas fa-shield-alt"></i> <strong>CRITICAL SECURITY WARNING:</strong> 
+		Do NOT use the same domain for CTFd and challenge containers. Attackers with RCE can steal session cookies.
+		<hr>
+		<strong><i class="fas fa-times-circle text-danger"></i> Vulnerable:</strong> CTFd at <code>ctf.example.com</code>, challenges at <code>ctf.example.com:30000</code><br>
+		<strong><i class="fas fa-check-circle text-success"></i> Secure:</strong> CTFd at <code>ctf.example.com</code>, challenges at <code>challenges.example.com</code> or <code>203.0.113.10</code>
+	</div>
+
 	<div class="alert alert-info mb-3">
-		<i class="fas fa-info-circle"></i> <strong>Global Settings:</strong> These settings apply to ALL container challenges. 
+		<i class="fas fa-cog"></i> <strong>Global Settings:</strong> These settings apply to ALL container challenges. 
 		Individual challenges no longer have separate timeout/resource limits - they all use these global values.
 	</div>
 
@@ -76,7 +84,7 @@
 
 	<div class="form-group mt-3">
 		<button type="submit" class="btn btn-primary">
-			<i class="fas fa-save"></i> Save Settings
+			<i class="fas fa-check-circle"></i> Save Settings
 		</button>
 	</div>
 </form>
