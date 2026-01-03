@@ -1,12 +1,12 @@
 <li class="nav-item">
-	<a class="nav-link {% if active_page == 'dashboard' %}active{% endif %}" href="{{ url_for('containers_admin.dashboard') }}">Instances</a>
+	<a class="nav-link {% if active_page == 'dashboard' %}active{% endif %}" href="{{ url_for('containers_admin.dashboard') }}"><i class="fas fa-list"></i> Instances</a>
 </li>
 <li class="nav-item">
-	<a class="nav-link {% if active_page == 'settings' %}active{% endif %}" href="{{ url_for('containers_admin.settings') }}">Settings</a>
+	<a class="nav-link {% if active_page == 'settings' %}active{% endif %}" href="{{ url_for('containers_admin.settings') }}"><i class="fas fa-cog"></i> Settings</a>
 </li>
 <li class="nav-item">
-	<a class="nav-link {% if active_page == 'cheats' %}active{% endif %}" href="{{ url_for('containers_admin.cheats') }}">Cheat Logs</a>
+	<a class="nav-link {% if active_page == 'cheats' %}active{% endif %}" href="{{ url_for('containers_admin.cheats') }}"><i class="fas fa-book"></i> Cheat Logs</a>
 </li>
 <li class="nav-item">
-	<a class="nav-link {% if active_page == 'import' %}active{% endif %}" href="{{ url_for('containers_admin.import_challenges_page') }}">Import</a>
+	<a class="nav-link {% if active_page == 'import' %}active{% endif %}" href="{{ url_for('containers_admin.import_challenges_page') }}"><i class="fas fa-upload"></i> Import</a>
 </li>
