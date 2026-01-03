@@ -103,7 +103,7 @@ class DockerService:
                 name=name,
                 command=command,
                 detach=True,
-                auto_remove=False,  # Don't auto remove to be able to inspect logs
+                auto_remove=True,  # Auto remove when container stops/fails
                 ports={f'{internal_port}/tcp': host_port},
                 environment=environment or {},
                 mem_limit=memory_limit,
