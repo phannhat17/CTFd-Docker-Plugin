@@ -1,12 +1,21 @@
-<div class="tab-pane fade show active" id="docker" role="tabpanel" aria-autocomplete="none">
-    <h5>Status</h5>
-    <small class="form-text text-muted">
-        Status of communication with Docker service :
-        {% if connected %}
-        <b><span style="color:green">reachable</span></b>
-        {% else %}
-        <b><span style="color:red">unreachable</span></b>
+<div class="mt-4 p-3 border rounded bg-light">
+    <div class="row">
+        <div class="col-md-6">
+            <small class="form-text text-muted">
+                Connection status:
+                {% if connected %}
+                <b><span style="color:green"><i class="fas fa-check-circle"></i> Reachable</span></b>
+                {% else %}
+                <b><span style="color:red"><i class="fas fa-times-circle"></i> Unreachable</span></b>
+                {% endif %}
+            </small>
+        </div>
+        {% if docker_info %}
+        <div class="col-md-6">
+            <small class="form-text text-muted">
+                <strong>Docker version:</strong> {{ docker_info.version }}
+            </small>
+        </div>
         {% endif %}
-    </small><br>
-
+    </div>
 </div>

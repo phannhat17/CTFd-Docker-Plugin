@@ -30,6 +30,33 @@ def set_services(d_service, c_service, a_service):
 # Admin Pages
 # ============================================================================
 
+def _get_docker_status():
+    """Helper function to get Docker status for all pages"""
+    connected = False
+    docker_info = None
+    
+    try:
+        if docker_service and docker_service.is_connected():
+            connected = True
+            client = docker_service.client
+            version_info = client.version()
+            system_info = client.info()
+            
+            docker_info = {
+                'version': version_info.get('Version', 'Unknown'),
+                'api_version': version_info.get('ApiVersion', 'Unknown'),
+                'containers_running': system_info.get('ContainersRunning', 0),
+                'containers_stopped': system_info.get('ContainersStopped', 0),
+                'images': system_info.get('Images', 0),
+                'cpus': system_info.get('NCPU', 0),
+                'memory_total': system_info.get('MemTotal', 0)
+            }
+    except:
+        pass
+    
+    return connected, docker_info
+
+
 @admin_bp.route('/dashboard')
 @admins_only
 def dashboard():
@@ -45,6 +72,9 @@ def dashboard():
     running_count = len(running_instances)
     total_count = ContainerInstance.query.count()
     
+    # Get Docker status
+    connected, docker_info = _get_docker_status()
+    
     return render_template('container_dashboard.html',
                          running_instances=running_instances,
                          provisioning_instances=provisioning_instances,
@@ -52,7 +82,10 @@ def dashboard():
                          stopped_instances=stopped_instances,
                          error_instances=error_instances,
                          running_count=running_count,
-                         total_count=total_count)
+                         total_count=total_count,
+                         connected=connected,
+                         docker_info=docker_info,
+                         active_page='dashboard')
 
 
 @admin_bp.route('/settings')
@@ -68,7 +101,17 @@ def settings():
         'container_maxmemory': ContainerConfig.get('max_memory', '512m'),
         'container_maxcpu': ContainerConfig.get('max_cpu', '0.5'),
     }
-    return render_template('container_settings.html', settings=settings_data)
+    
+    # Get Docker status
+    connected, docker_info = _get_docker_status()
+    error_message = None
+    
+    return render_template('container_settings.html', 
+                         settings=settings_data,
+                         connected=connected,
+                         docker_info=docker_info,
+                         error_message=error_message,
+                         active_page='settings')
 
 
 @admin_bp.route('/cheats')
@@ -104,7 +147,14 @@ def cheats():
                     log.owner_team = owner_team
                     log.owner_user_obj = None
     
-    return render_template('container_cheat.html', cheat_logs=cheat_logs)
+    # Get Docker status
+    connected, docker_info = _get_docker_status()
+    
+    return render_template('container_cheat.html', 
+                         cheat_logs=cheat_logs, 
+                         connected=connected, 
+                         docker_info=docker_info,
+                         active_page='cheats')
 
 
 # ============================================================================
@@ -390,3 +440,78 @@ def list_images():
         return jsonify({'images': image_list})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@admin_bp.route('/api/docker/health', methods=['GET'], endpoint='api_docker_health')
+@admins_only
+def docker_health_check():
+    """
+    Check Docker connection health
+    
+    Returns:
+        {
+            "connected": bool,
+            "docker_version": str,
+            "api_version": str,
+            "server_info": {
+                "containers": int,
+                "images": int,
+                "memory_total": int,
+                "cpus": int
+            },
+            "error": str (if connection failed)
+        }
+    """
+    try:
+        if not docker_service:
+            return jsonify({
+                'connected': False,
+                'error': 'Docker service not initialized'
+            }), 500
+        
+        # Check connection
+        is_connected = docker_service.is_connected()
+        
+        if not is_connected:
+            return jsonify({
+                'connected': False,
+                'error': 'Cannot connect to Docker daemon',
+                'socket': ContainerConfig.get('docker_socket', 'Not configured')
+            })
+        
+        # Get Docker info
+        try:
+            client = docker_service.client
+            version_info = client.version()
+            system_info = client.info()
+            
+            return jsonify({
+                'connected': True,
+                'docker_version': version_info.get('Version', 'Unknown'),
+                'api_version': version_info.get('ApiVersion', 'Unknown'),
+                'server_info': {
+                    'containers': system_info.get('Containers', 0),
+                    'containers_running': system_info.get('ContainersRunning', 0),
+                    'containers_paused': system_info.get('ContainersPaused', 0),
+                    'containers_stopped': system_info.get('ContainersStopped', 0),
+                    'images': system_info.get('Images', 0),
+                    'memory_total': system_info.get('MemTotal', 0),
+                    'cpus': system_info.get('NCPU', 0),
+                    'server_version': system_info.get('ServerVersion', 'Unknown'),
+                    'operating_system': system_info.get('OperatingSystem', 'Unknown'),
+                    'architecture': system_info.get('Architecture', 'Unknown')
+                },
+                'socket': ContainerConfig.get('docker_socket', 'Not configured')
+            })
+        except Exception as info_error:
+            return jsonify({
+                'connected': True,
+                'error': f'Connected but failed to get info: {str(info_error)}',
+                'socket': ContainerConfig.get('docker_socket', 'Not configured')
+            })
+    
+    except Exception as e:
+        return jsonify({
+            'connected': False,
+            'error': str(e)
+        }), 500

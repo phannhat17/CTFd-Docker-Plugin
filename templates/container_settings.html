@@ -1,24 +1,10 @@
-{% extends "admin/base.html" %}
+{% extends "container_base.html" %}
 
-{% block content %}
-<div class="jumbotron">
-	<div class="container">
-		<h1>Container Settings</h1>
-	</div>
-</div>
-<div class="container-fluid">
-	<ul class="nav nav-tabs mb-3">
-		<li class="nav-item">
-			<a class="nav-link" href="{{ url_for('containers_admin.dashboard') }}">Instances</a>
-		</li>
-		<li class="nav-item">
-			<a class="nav-link active" href="{{ url_for('containers_admin.settings') }}">Settings</a>
-		</li>
-		<li class="nav-item">
-			<a class="nav-link" href="{{ url_for('containers_admin.cheats') }}">Anti-Cheat Logs</a>
-		</li>
-	</ul>
+{% block menu %}
+{% include "config/container_menu.html" %}
+{% endblock %}
 
+{% block panel %}
 	<form id="settings-form">
 		<div class="card">
 			<div class="card-header">
@@ -83,13 +69,14 @@
 			</div>
 		</div>
 
-		<div class="form-group mt-3">
-			<button type="submit" class="btn btn-primary">
-				<i class="fas fa-save"></i> Save Settings
-			</button>
-		</div>
-	</form>
-</div>
+	<div class="form-group mt-3">
+		<button type="submit" class="btn btn-primary">
+			<i class="fas fa-save"></i> Save Settings
+		</button>
+	</div>
+</form>
+{% include "config/container_status.html" %}
+
 {% endblock %}
 
 {% block scripts %}

@@ -1,11 +1,18 @@
 {% extends "container_base.html" %}
 
 {% block menu %}
-{% include "config/container_menu.html" %}
+<li class="nav-item">
+	<a class="nav-link active" href="#">Instances</a>
+</li>
+<li class="nav-item">
+	<a class="nav-link" href="/containers/admin/settings">&#128279; Settings</a>
+</li>
+<li class="nav-item">
+	<a class="nav-link" href="/containers/admin/cheat">&#128279; Share flag</a>
+</li>
 {% endblock %}
 
 {% block panel %}
-
 <div class="btn-group mb-2" role="group">
 	<button type="button" class="btn btn-outline-danger" data-toggle="tooltip" title="" id="instances-delete-button"
 		data-test-id="cm-button-destroy" data-original-title="Destroy Instances" onclick="bulkDeleteContainers()">
@@ -18,7 +25,7 @@
 		<tr>
 			<th class="border-right" data-checkbox>
 				<div class="form-check text-center" data-test-id="cm-checkbox-all">&nbsp; <input type="checkbox"
-						class="form-check-input" data-checkbox-all id="select-all">
+						class="form-check-input" data-checkbox-all>
 				</div>
 			</th>
 			<th class="sort-col text-center">
@@ -31,16 +38,16 @@
 				<b>Team/User</b>
 				</td>
 			<th class="text-center">
-				<b>Status</b>
+				<b>Flag</b>
 				</td>
 			<th class="sort-col text-center">
 				<b>Created</b>
 				</td>
 			<th class="sort-col text-center">
-				<b>Expires</b>
+				<b>End</b>
 			</td>
 			<th class="text-center">
-				<b>Port</b>
+				<b>Connect Info</b>
 				</td>
 			<th class="text-center">
 				<b>Destroy</b>
@@ -48,76 +55,67 @@
 		</tr>
 	</thead>
 	<tbody>
-		{% if running_instances and running_instances|length > 0 %}
-		{% for instance in running_instances %}
-		<tr data-instance-id="{{ instance.id }}">
+		{% if containers %}
+		{% for c in containers %}
+		<tr>
 			<td class="border-right" data-checkbox>
 				<div class="form-check text-center">&nbsp; <input type="checkbox" class="form-check-input container-checkbox"
-						value="{{ instance.id }}">
+						value="{{ c.container_id }}">
 				</div>
 			</td>
 			<td class="text-center">
 				<div class="form-check" id="challenge-id-div">
-					<a href="{{ url_for('admin.challenges_detail', challenge_id=instance.challenge_id) }}">
-						{{ instance.challenge.name }}
+					<a href="{{ url_for('admin.challenges_detail', challenge_id=c.challenge_id) }}">
+						{{ c.challenge.name }}
 					</a>
 				</div>
 			</td>
 			<td class="text-center">
 				<div class="form-check text-center">
-					{{ instance.container_id[:12] if instance.container_id else 'N/A' }}
+					{{ c.container_id[:12] }}
 				</div>
 			</td>
 			<td class="text-center">
-				{% if instance.team_id %}
-				<a href="{{ url_for('admin.teams_detail', team_id=instance.team_id) }}">
-					{{ instance.team.name }}
-				</a>
-				{% elif instance.user_id %}
-				<a href="{{ url_for('admin.users_detail', user_id=instance.user_id) }}">
-					{{ instance.user.name }}
+				{% if c.team == None %}
+				<a href="{{ url_for('admin.users_detail', user_id=c.user_id) }}">
+					{{ c.user.name }}
 				</a>
 				{% else %}
-				N/A
-				{% endif %}
+				<a href="{{ url_for('admin.teams_detail', team_id=c.team_id) }}">
+					{{ c.team.name }}
+				</a> {% endif %}
 			</td>
 			<td class="text-center">
 				<div class="form-check text-center">
-					<span class="badge badge-{{ 'success' if instance.status == 'running' else 'warning' if instance.status == 'provisioning' else 'secondary' }}">
-						{{ instance.status }}
-					</span>
+					{{ c.flag }}
 				</div>
 			</td>
 			<td class="text-center timestamp">
-				{{ instance.created_at.timestamp() if instance.created_at else '' }}
+				{{ c.timestamp }}
 			</td>
 			<td class="text-center timestamp">
-				{{ instance.expires_at.timestamp() if instance.expires_at else '' }}
+				{{ c.expires }}
 			</td>
 			<td class="text-center">
 				<div class="form-check text-center">
-					{{ instance.exposed_port if instance.exposed_port else 'N/A' }}
+					{{ c.challenge.connection_type }} - {{ c.port }}
 				</div>
 			</td>
 			<td class="text-center">
-				<button class="btn btn-link p-0 delete-instance" onclick="deleteInstance({{ instance.id }})"
+				<button class="btn btn-link p-0 delete-instance" onclick="killContainer('{{ c.container_id }}')"
 					title="Destroy">
 					<i class="btn-fa fas fa-trash-alt"></i>
 				</button>
 			</td>
 		</tr>
 		{% endfor %}
-		{% else %}
-		<tr>
-			<td colspan="9" class="text-center text-muted">
-				No container instances found
-			</td>
-		</tr>
 		{% endif %}
 	</tbody>
 </table>
 {% include "config/container_status.html" %}
+
 {% endblock %}
+
 
 {% block scripts %}
 <script>
@@ -152,27 +150,56 @@
 		convertToGMT7();
 	});
 
-	function deleteInstance(instanceId) {
-		if (!confirm('Are you sure you want to delete this container?')) return;
-		
-		fetch('{{ url_for("containers_admin.api_instances") }}/' + instanceId, {
-			method: 'DELETE',
+	function killContainer(container_id) {
+		var path = "/containers/admin/api/kill";
+
+		fetch(path, {
+			method: "POST",
 			headers: {
-				'Content-Type': 'application/json',
-				'CSRF-Token': init.csrfNonce
-			}
+				"Content-Type": "application/json",
+				"Accept": "application/json",
+				"CSRF-Token": init.csrfNonce,
+			},
+			body: JSON.stringify({ container_id: container_id }),
 		})
-		.then(response => response.json())
-		.then(data => {
-			if (data.success) {
-				window.location.reload();
-			} else {
-				alert('Error: ' + (data.error || 'Unknown error'));
-			}
+			.then((response) => response.json())
+			.then((data) => {
+				if (data.success == undefined) {
+					purgeButton.removeAttribute("disabled");
+				} else {
+					window.location.reload();
+				}
+				console.log(data);
+			})
+			.catch((error) => {
+				console.error("Error:", error);
+			});
+	}
+
+	function container_renew(container_id) {
+		var path = "/containers/api/admin/restart";
+
+		fetch(path, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				"Accept": "application/json",
+				"CSRF-Token": init.csrfNonce
+			},
+			body: JSON.stringify({ container_id: container_id }),
 		})
-		.catch(error => {
-			console.error('Error:', error);
-		});
+			.then((response) => response.json())
+			.then((data) => {
+				if (data.success == undefined) {
+					purgeButton.removeAttribute("disabled");
+				} else {
+					window.location.reload();
+				}
+				console.log(data);
+			})
+			.catch((error) => {
+				console.error("Error:", error);
+			});
 	}
 
 	function bulkDeleteContainers() {
@@ -189,14 +216,14 @@
 		let confirmDelete = confirm(`Are you sure you want to delete ${selectedContainers.length} container(s)?`);
 		if (!confirmDelete) return;
 
-		fetch('{{ url_for("containers_admin.api_bulk_delete") }}', {
+		fetch("/containers/admin/api/purge", {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
 				"Accept": "application/json",
 				"CSRF-Token": init.csrfNonce
 			},
-			body: JSON.stringify({ instance_ids: selectedContainers }),
+			body: JSON.stringify({ container_ids: selectedContainers }),
 		})
 			.then(response => response.json())
 			.then(data => {

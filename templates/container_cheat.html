@@ -1,23 +1,10 @@
-{% extends "admin/base.html" %}
+{% extends "container_base.html" %}
 
-{% block content %}
-<div class="jumbotron">
-	<div class="container">
-		<h1>Anti-Cheat Logs</h1>
-	</div>
-</div>
-<div class="container-fluid">
-	<ul class="nav nav-tabs mb-3">
-		<li class="nav-item">
-			<a class="nav-link" href="{{ url_for('containers_admin.dashboard') }}">Instances</a>
-		</li>
-		<li class="nav-item">
-			<a class="nav-link" href="{{ url_for('containers_admin.settings') }}">Settings</a>
-		</li>
-		<li class="nav-item">
-			<a class="nav-link active" href="{{ url_for('containers_admin.cheats') }}">Anti-Cheat Logs</a>
-		</li>
-	</ul>
+{% block menu %}
+{% include "config/container_menu.html" %}
+{% endblock %}
+
+{% block panel %}
 
 	{% if cheat_logs and cheat_logs|length > 0 %}
 	<div class="alert alert-warning">
@@ -83,7 +70,9 @@
 		<i class="fas fa-check-circle"></i> No cheating events detected. All submissions are legitimate.
 	</div>
 	{% endif %}
-</div>
+</table>
+{% include "config/container_status.html" %}
+
 {% endblock %}
 
 {% block scripts %}
