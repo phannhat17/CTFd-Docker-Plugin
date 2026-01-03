@@ -1,7 +1,7 @@
 """
 Admin Routes - Container management for admins
 """
-from flask import Blueprint, request, jsonify, render_template
+from flask import Blueprint, request, jsonify, render_template, session
 from CTFd.utils.decorators import admins_only
 from CTFd.models import db
 from ..models.instance import ContainerInstance
@@ -9,6 +9,7 @@ from ..models.challenge import ContainerChallenge
 from ..models.flag import ContainerFlagAttempt
 from ..models.audit import ContainerAuditLog
 from ..models.config import ContainerConfig
+from CTFd.utils.security.auth import generate_nonce
 
 admin_bp = Blueprint('containers_admin', __name__, url_prefix='/admin/containers')
 
@@ -535,3 +536,256 @@ def docker_health_check():
             'connected': False,
             'error': str(e)
         }), 500
+
+
+# ============================================================================
+# Import Challenges from Excel
+# ============================================================================
+
+@admin_bp.route('/import', methods=['GET'])
+@admins_only
+def import_challenges_page():
+    """Show import page"""
+    # Get Docker status for template
+    connected, docker_info = _get_docker_status()
+    return render_template('container_import.html',
+                         docker_connected=connected,
+                         docker_info=docker_info)
+
+
+@admin_bp.route('/api/import', methods=['POST'])
+@admins_only
+def import_challenges():
+    """Import challenges from Excel file (API endpoint)"""
+    # Get Docker status for error responses
+    connected, docker_info = _get_docker_status()
+    try:
+        import openpyxl
+        import re
+        from werkzeug.utils import secure_filename
+        from CTFd.models import Challenges, Flags
+        
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'error': 'No file uploaded'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'success': False, 'error': 'No file selected'}), 400
+        
+        if not file.filename.endswith(('.xlsx', '.xls')):
+            return jsonify({'success': False, 'error': 'File must be Excel (.xlsx or .xls)'}), 400
+        
+        # Read Excel
+        wb = openpyxl.load_workbook(file, data_only=True)
+        
+        # Try to find "Challenges" sheet or use first sheet
+        if 'Challenges' in wb.sheetnames:
+            ws = wb['Challenges']
+        else:
+            ws = wb.active
+        
+        # Parse header row
+        headers = []
+        for cell in ws[1]:
+            headers.append(cell.value.lower().strip() if cell.value else '')
+        
+        # Required columns
+        required = ['name', 'category', 'image']
+        for req in required:
+            if req not in headers:
+                return jsonify({'success': False, 'error': f'Missing required column: {req}'}), 400
+        
+        # Import challenges
+        created_count = 0
+        errors = []
+        
+        for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+            try:
+                # Map row to dict
+                row_data = {}
+                for idx, value in enumerate(row):
+                    if idx < len(headers) and headers[idx]:
+                        row_data[headers[idx]] = value
+                
+                # Skip empty rows
+                if not row_data.get('name'):
+                    continue
+                
+                # Parse flag pattern
+                flag_pattern = row_data.get('flag_pattern', 'CTF{flag}')
+                flag_mode = 'static'
+                flag_prefix = 'CTF{'
+                flag_suffix = '}'
+                random_flag_length = 0
+                
+                random_match = re.search(r'<ran_(\d+)>', flag_pattern)
+                if random_match:
+                    flag_mode = 'random'
+                    random_flag_length = int(random_match.group(1))
+                    parts = flag_pattern.split(random_match.group(0))
+                    flag_prefix = parts[0] if len(parts) > 0 else 'CTF{'
+                    flag_suffix = parts[1] if len(parts) > 1 else '}'
+                else:
+                    flag_prefix = flag_pattern
+                    flag_suffix = ''
+                
+                # Parse scoring
+                scoring_type = str(row_data.get('scoring_type', 'standard')).lower()
+                value = None
+                container_initial = None
+                container_decay = None
+                container_minimum = None
+                decay_function = 'logarithmic'
+                
+                if scoring_type == 'dynamic':
+                    container_initial = int(row_data.get('initial', 500))
+                    container_decay = int(row_data.get('decay', 20))
+                    container_minimum = int(row_data.get('minimum', 100))
+                    decay_function = str(row_data.get('decay_function', 'logarithmic')).lower()
+                    value = container_initial
+                else:
+                    value = int(row_data.get('value', 100))
+                    container_initial = None
+                    container_decay = None
+                    container_minimum = None
+                
+                # Create challenge
+                challenge = ContainerChallenge(
+                    name=str(row_data['name']),
+                    category=str(row_data['category']),
+                    description=str(row_data.get('description', '')),
+                    value=value,
+                    state=str(row_data.get('state', 'visible')),
+                    type='container',
+                    
+                    # Container fields
+                    image=str(row_data['image']),
+                    internal_port=int(row_data.get('internal_port', 22)),
+                    command=str(row_data.get('command', '')),
+                    container_connection_type=str(row_data.get('connection_type', 'ssh')),
+                    container_connection_info=str(row_data.get('connection_info', '')),
+                    
+                    # Flag fields
+                    flag_mode=flag_mode,
+                    flag_prefix=flag_prefix,
+                    flag_suffix=flag_suffix,
+                    random_flag_length=random_flag_length,
+                    
+                    # Scoring fields
+                    container_initial=container_initial,
+                    container_decay=container_decay,
+                    container_minimum=container_minimum,
+                    decay_function=decay_function
+                )
+                
+                db.session.add(challenge)
+                db.session.flush()  # Get ID
+                
+                # Create dummy flag
+                dummy_flag = Flags(
+                    challenge_id=challenge.id,
+                    type='static',
+                    content='[Container flag - auto-generated per instance]',
+                    data=''
+                )
+                db.session.add(dummy_flag)
+                
+                created_count += 1
+                
+            except Exception as e:
+                errors.append(f'Row {row_idx}: {str(e)}')
+                continue
+        
+        db.session.commit()
+        
+        # Return JSON response
+        return jsonify({
+            'success': True,
+            'created': created_count,
+            'errors': errors
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@admin_bp.route('/download-template')
+@admins_only
+def download_template():
+    """Download CSV template for importing challenges"""
+    try:
+        from flask import make_response
+        import io
+        
+        # CSV headers
+        headers = [
+            'name', 'category', 'description', 'image', 'internal_port',
+            'command', 'connection_type', 'connection_info',
+            'flag_pattern', 'scoring_type', 'value',
+            'initial', 'decay', 'minimum', 'decay_function', 'state'
+        ]
+        
+        # Example rows
+        examples = [
+            {
+                'name': 'Web Challenge Example',
+                'category': 'Web',
+                'description': 'Find the flag',
+                'image': 'nginx:latest',
+                'internal_port': '80',
+                'command': '',
+                'connection_type': 'http',
+                'connection_info': 'Access via browser',
+                'flag_pattern': 'CTF{static_flag}',
+                'scoring_type': 'standard',
+                'value': '100',
+                'initial': '',
+                'decay': '',
+                'minimum': '',
+                'decay_function': '',
+                'state': 'visible'
+            },
+            {
+                'name': 'SSH Challenge Example',
+                'category': 'Pwn',
+                'description': 'SSH and find flag',
+                'image': 'ubuntu:20.04',
+                'internal_port': '22',
+                'command': '/usr/sbin/sshd -D',
+                'connection_type': 'ssh',
+                'connection_info': 'user:ctf pass:ctf',
+                'flag_pattern': 'CTF{<ran_16>}',
+                'scoring_type': 'dynamic',
+                'value': '',
+                'initial': '500',
+                'decay': '20',
+                'minimum': '100',
+                'decay_function': 'logarithmic',
+                'state': 'visible'
+            }
+        ]
+        
+        # Build CSV
+        output = io.StringIO()
+        output.write(','.join(headers) + '\n')
+        
+        for example in examples:
+            row = []
+            for header in headers:
+                value = example.get(header, '')
+                # Escape commas and quotes
+                if ',' in value or '"' in value:
+                    value = '"' + value.replace('"', '""') + '"'
+                row.append(value)
+            output.write(','.join(row) + '\n')
+        
+        # Create response
+        response = make_response(output.getvalue())
+        response.headers['Content-Type'] = 'text/csv'
+        response.headers['Content-Disposition'] = 'attachment; filename=container_challenges_template.csv'
+        
+        return response
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

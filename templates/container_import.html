@@ -1,0 +1,246 @@
+{% extends "container_base.html" %}
+
+{% set active_page = 'import' %}
+
+{% block menu %}
+{% include "config/container_menu.html" %}
+{% endblock %}
+
+{% block panel %}
+
+<div class="row">
+	<div class="col-md-12">
+		<h3>Import Challenges from Excel</h3>
+		<p class="text-muted">Upload an Excel file (.xlsx) to create multiple container challenges at once.</p>
+	</div>
+</div>
+
+<div class="row mt-3">
+	<div class="col-md-6">
+		<div class="card">
+			<div class="card-header">
+				<h5>Upload CSV File</h5>
+			</div>
+			<div class="card-body">
+				<form id="import-form">
+					<div class="form-group">
+						<label for="csv-file">CSV File</label>
+						<input type="file" class="form-control-file" id="csv-file" name="file" accept=".csv" required>
+						<small class="form-text text-muted">
+							CSV file with challenge data
+						</small>
+					</div>
+					
+					<button type="submit" class="btn btn-primary" id="import-btn">
+						<i class="fas fa-upload"></i> Import Challenges
+					</button>
+				</form>
+				
+				<div id="import-result" class="mt-3"></div>
+				<div id="import-progress" class="mt-3" style="display: none;">
+					<div class="progress">
+						<div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+					</div>
+					<small id="progress-text" class="text-muted"></small>
+				</div>
+			</div>
+		</div>
+	</div>
+	
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Parse CSV
+function parseCSV(text) {
+	const lines = text.split('\n').filter(line => line.trim());
+	if (lines.length < 2) return [];
+	
+	const headers = lines[0].split(',').map(h => h.trim().replace(/['"]/g, ''));
+	const rows = [];
+	
+	for (let i = 1; i < lines.length; i++) {
+		const values = lines[i].split(',').map(v => v.trim().replace(/^["']|["']$/g, ''));
+		const row = {};
+		headers.forEach((header, idx) => {
+			row[header] = values[idx] || '';
+		});
+		if (row.name) rows.push(row);
+	}
+	
+	return rows;
+}
+
+// Parse flag pattern
+function parseFlagPattern(pattern) {
+	if (!pattern) pattern = 'CTF{flag}';
+	
+	const randomMatch = pattern.match(/<ran_(\d+)>/);
+	if (randomMatch) {
+		const length = parseInt(randomMatch[1]);
+		const parts = pattern.split(randomMatch[0]);
+		return {
+			mode: 'random',
+			prefix: parts[0] || 'CTF{',
+			suffix: parts[1] || '}',
+			length: length
+		};
+	}
+	
+	return {
+		mode: 'static',
+		prefix: pattern,
+		suffix: '',
+		length: 0
+	};
+}
+
+// Create challenge via CTFd API
+async function createChallenge(data) {
+	const flag = parseFlagPattern(data.flag_pattern);
+	const scoringType = (data.scoring_type || 'standard').toLowerCase();
+	
+	// Build challenge data for container type
+	const challengeData = {
+		name: data.name,
+		category: data.category,
+		description: data.description || '',
+		type: 'container',
+		state: data.state || 'visible',
+		
+		// Container-specific fields
+		image: data.image,
+		internal_port: parseInt(data.internal_port) || 22,
+		command: data.command || '',
+		connection_type: data.connection_type || 'ssh',
+		connection_info: data.connection_info || '',
+		
+		// Flag fields
+		flag_mode: flag.mode,
+		flag_prefix: flag.prefix,
+		flag_suffix: flag.suffix,
+		random_flag_length: flag.length
+	};
+	
+	// Scoring
+	if (scoringType === 'dynamic') {
+		challengeData.initial = parseInt(data.initial) || 500;
+		challengeData.decay = parseInt(data.decay) || 20;
+		challengeData.minimum = parseInt(data.minimum) || 100;
+		challengeData.decay_function = data.decay_function || 'logarithmic';
+		challengeData.value = challengeData.initial;
+	} else {
+		challengeData.value = parseInt(data.value) || 100;
+	}
+	
+	// Call CTFd API
+	const response = await fetch('/api/v1/challenges', {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			'CSRF-Token': init.csrfNonce
+		},
+		body: JSON.stringify(challengeData)
+	});
+	
+	if (!response.ok) {
+		const error = await response.json();
+		throw new Error(error.message || 'Failed to create challenge');
+	}
+	
+	return await response.json();
+}
+
+// Handle form submit
+document.getElementById('import-form').addEventListener('submit', async function(e) {
+	e.preventDefault();
+	
+	const fileInput = document.getElementById('csv-file');
+	const resultDiv = document.getElementById('import-result');
+	const progressDiv = document.getElementById('import-progress');
+	const progressBar = document.getElementById('progress-bar');
+	const progressText = document.getElementById('progress-text');
+	const importBtn = document.getElementById('import-btn');
+	
+	if (!fileInput.files || !fileInput.files[0]) {
+		resultDiv.innerHTML = '<div class="alert alert-danger">Please select a CSV file</div>';
+		return;
+	}
+	
+	// Disable button
+	importBtn.disabled = true;
+	importBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+	resultDiv.innerHTML = '';
+	progressDiv.style.display = 'block';
+	
+	try {
+		// Read CSV file
+		const file = fileInput.files[0];
+		const text = await file.text();
+		const rows = parseCSV(text);
+		
+		if (rows.length === 0) {
+			throw new Error('No valid rows found in CSV');
+		}
+		
+		// Validate required columns
+		const firstRow = rows[0];
+		if (!firstRow.name || !firstRow.category || !firstRow.image) {
+			throw new Error('CSV must have columns: name, category, image');
+		}
+		
+		// Create challenges
+		let created = 0;
+		const errors = [];
+		
+		for (let i = 0; i < rows.length; i++) {
+			const row = rows[i];
+			const progress = ((i + 1) / rows.length * 100).toFixed(0);
+			progressBar.style.width = progress + '%';
+			progressText.textContent = `Creating challenge ${i + 1} of ${rows.length}: ${row.name}`;
+			
+			try {
+				await createChallenge(row);
+				created++;
+			} catch (err) {
+				errors.push(`Row ${i + 2} (${row.name}): ${err.message}`);
+			}
+		}
+		
+		// Show results
+		progressDiv.style.display = 'none';
+		let html = `<div class="alert alert-success">
+			<strong>Success!</strong> Created ${created} of ${rows.length} challenge(s).
+		</div>`;
+		
+		if (errors.length > 0) {
+			html += '<div class="alert alert-warning"><strong>Errors:</strong><ul>';
+			errors.forEach(err => {
+				html += `<li>${err}</li>`;
+			});
+			html += '</ul></div>';
+		}
+		
+		resultDiv.innerHTML = html;
+		
+		// Redirect after 3 seconds if all successful
+		if (errors.length === 0) {
+			setTimeout(() => {
+				window.location.href = '/admin/challenges';
+			}, 3000);
+		}
+		
+	} catch (error) {
+		progressDiv.style.display = 'none';
+		resultDiv.innerHTML = `<div class="alert alert-danger">
+			<strong>Error:</strong> ${error.message}
+		</div>`;
+	} finally {
+		importBtn.disabled = false;
+		importBtn.innerHTML = '<i class="fas fa-upload"></i> Import Challenges';
+	}
+});
+</script>
+{% endblock %}

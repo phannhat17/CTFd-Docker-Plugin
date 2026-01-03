@@ -7,3 +7,6 @@
 <li class="nav-item">
 	<a class="nav-link {% if active_page == 'cheats' %}active{% endif %}" href="{{ url_for('containers_admin.cheats') }}">Cheat Logs</a>
 </li>
+<li class="nav-item">
+	<a class="nav-link {% if active_page == 'import' %}active{% endif %}" href="{{ url_for('containers_admin.import_challenges_page') }}">Import</a>
+</li>

@@ -1,0 +1,4 @@
+name,category,description,image,internal_port,command,connection_type,connection_info,flag_pattern,scoring_type,value,initial,decay,minimum,decay_function,state
+Web Shell Challenge,Web,Find and exploit the web shell vulnerability to get the flag,nginx:latest,80,,http,Access via browser at http://IP:PORT,CTF{web_sh3ll_<ran_8>},dynamic,,500,20,100,logarithmic,visible
+SSH Pwn Box,Pwn,SSH into the server and escalate privileges,ubuntu:20.04,22,/usr/sbin/sshd -D,ssh,Username: ctf Password: ctf123,CTF{ssh_pwn_<ran_12>},standard,150,,,,standard,visible
+Simple Static Challenge,Misc,Easy challenge with static flag,alpine:latest,80,,http,Just access and get flag,CTF{static_test_flag},standard,50,,,,standard,visible
