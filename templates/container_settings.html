@@ -83,6 +83,38 @@
 			</div>
 		</div>
 
+		<div class="card mt-3">
+			<div class="card-header">
+				<h5>Port Configuration</h5>
+			</div>
+			<div class="card-body">
+				<div class="form-row">
+					<div class="form-group col-md-6">
+						<label for="port_range_start">Port Range Start</label>
+						<input class="form-control" type="number" name="port_range_start" id="port_range_start"
+							placeholder="30000" value="{{ settings.port_range_start }}">
+						<small class="form-text text-muted">
+							Starting port for container allocation
+						</small>
+					</div>
+					<div class="form-group col-md-6">
+						<label for="port_range_end">Port Range End</label>
+						<input class="form-control" type="number" name="port_range_end" id="port_range_end"
+							placeholder="31000" value="{{ settings.port_range_end }}">
+						<small class="form-text text-muted">
+							Ending port for container allocation
+						</small>
+					</div>
+				</div>
+				<div class="alert alert-warning">
+					<i class="fas fa-exclamation-triangle"></i> <strong>Note:</strong> 
+					Make sure these ports are open in your firewall and not used by other services.
+					Port range: {{ settings.port_range_start }} - {{ settings.port_range_end }} 
+					(Total: {{ (settings.port_range_end|int - settings.port_range_start|int) }} ports available)
+				</div>
+			</div>
+		</div>
+
 	<div class="form-group mt-3">
 		<button type="submit" class="btn btn-primary">
 			<i class="fas fa-check-circle"></i> Save Settings

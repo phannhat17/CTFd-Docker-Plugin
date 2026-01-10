@@ -121,6 +121,8 @@ def settings():
         'max_renewals': ContainerConfig.get('max_renewals', '3'),
         'container_maxmemory': ContainerConfig.get('max_memory', '512m'),
         'container_maxcpu': ContainerConfig.get('max_cpu', '0.5'),
+        'port_range_start': ContainerConfig.get('port_range_start', '30000'),
+        'port_range_end': ContainerConfig.get('port_range_end', '31000'),
     }
     
     # Get Docker status

@@ -414,13 +414,24 @@ def load(app: Flask):
     
     # Initialize services
     try:
-        # Docker service
+        # Docker service - Try to initialize but don't fail if socket unavailable
         docker_socket = ContainerConfig.get('docker_socket', 'unix://var/run/docker.sock')
         docker_service = DockerService(base_url=docker_socket)
-        logger.info(f"Docker service initialized: {docker_socket}")
+        
+        # Test connection but don't fail plugin load if unavailable
+        if docker_service.is_connected():
+            logger.info(f"Docker service initialized and connected: {docker_socket}")
+        else:
+            logger.warning(f"Docker service initialized but not connected: {docker_socket}")
+            logger.warning("Plugin loaded successfully. Configure Docker socket in Admin → Containers → Settings")
     except Exception as e:
-        logger.error(f"Failed to initialize Docker service: {e}")
-        docker_service = None
+        logger.warning(f"Docker service initialization failed: {e}")
+        logger.warning("Plugin loaded successfully. Configure Docker socket in Admin → Containers → Settings")
+        # Create a dummy docker service that will fail gracefully
+        try:
+            docker_service = DockerService(base_url=docker_socket)
+        except:
+            docker_service = None
     
     # Flag service
     flag_service = FlagService()

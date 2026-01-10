@@ -27,15 +27,16 @@ class DockerService:
         self._connect()
     
     def _connect(self):
-        """Connect to Docker daemon"""
+        """Connect to Docker daemon - Don't raise exception, just log warning"""
         try:
             self.client = docker.DockerClient(base_url=self.base_url, timeout=10)
             self.client.ping()
             logger.info(f"Connected to Docker daemon at {self.base_url}")
         except Exception as e:
-            logger.error(f"Failed to connect to Docker: {e}")
+            logger.warning(f"Failed to connect to Docker: {e}")
+            logger.warning("Docker connection will be retried when needed. Configure in plugin settings.")
             self.client = None
-            raise Exception(f"Cannot connect to Docker daemon: {e}")
+            # Don't raise - allow plugin to load even if Docker is unavailable
     
     def is_connected(self) -> bool:
         """Check if Docker is connected"""
