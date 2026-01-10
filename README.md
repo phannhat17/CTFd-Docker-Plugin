@@ -40,7 +40,7 @@ A comprehensive CTFd plugin that enables dynamic Docker container challenges wit
 
 ## Installation
 
-3. **Configure Docker socket access:**
+1. **Configure Docker socket access:** (Optional)
 ```yaml
 # In docker-compose.yml
   ctfd:
@@ -48,7 +48,7 @@ A comprehensive CTFd plugin that enables dynamic Docker container challenges wit
       - /var/run/docker.sock:/var/run/docker.sock
 ```
 
-4. **Enable Redis keyspace notifications:**
+2. **Enable Redis keyspace notifications:**
 ```yaml
 # In docker-compose.yml
    cache:
@@ -94,7 +94,10 @@ Access admin panel: **Admin → Plugin → Containers → Settings**
 ![](./image-readme/settings.png)
 
 ### Global Settings
-- **Docker Socket Path**: Default `/var/run/docker.sock`
+- **Docker Connection Type**: 
+   - Local Docker: Auto connect with `unix://var/run/docker.sock` (must be add volumes at step 1 on Installation section)
+   - Remote SSH: set hostname, port, user, key and add the target server public key to know hosts file  
+   ![](./image-readme/sshconfig.png)
 - **Connection Hostname**: **CRITICAL - Set to separate domain/IP** (see Security above)
 - **Container Timeout**: Minutes before auto-expiration (default: 60)
 - **Max Renewals**: How many times users can extend (default: 3)
