@@ -129,6 +129,10 @@ def settings():
         'container_maxcpu': ContainerConfig.get('max_cpu', '0.5'),
         'port_range_start': ContainerConfig.get('port_range_start', '30000'),
         'port_range_end': ContainerConfig.get('port_range_end', '31000'),
+        # Subdomain routing (Traefik)
+        'subdomain_enabled': ContainerConfig.get('subdomain_enabled', 'false'),
+        'subdomain_base_domain': ContainerConfig.get('subdomain_base_domain', ''),
+        'subdomain_network': ContainerConfig.get('subdomain_network', 'ctfd-network'),
     }
     
     # Get Docker status

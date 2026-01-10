@@ -5,167 +5,231 @@
 {% endblock %}
 
 {% block panel %}
-	<div class="alert alert-danger mb-3">
-		<i class="fas fa-shield-alt"></i> <strong>CRITICAL SECURITY WARNING:</strong> 
-		Do NOT use the same domain for CTFd and challenge containers. Attackers with RCE can steal session cookies.
-		<hr>
-		<strong><i class="fas fa-times-circle text-danger"></i> Vulnerable:</strong> CTFd at <code>ctf.example.com</code>, challenges at <code>ctf.example.com:30000</code><br>
-		<strong><i class="fas fa-check-circle text-success"></i> Secure:</strong> CTFd at <code>ctf.example.com</code>, challenges at <code>challenges.example.com</code> or <code>203.0.113.10</code>
-	</div>
+<div class="alert alert-danger mb-3">
+	<i class="fas fa-shield-alt"></i> <strong>CRITICAL SECURITY WARNING:</strong>
+	Do NOT use the same domain for CTFd and challenge containers. Attackers with RCE can steal session cookies.
+	<hr>
+	<strong><i class="fas fa-times-circle text-danger"></i> Vulnerable:</strong> CTFd at <code>ctf.example.com</code>,
+	challenges at <code>ctf.example.com:30000</code><br>
+	<strong><i class="fas fa-check-circle text-success"></i> Secure:</strong> CTFd at <code>ctf.example.com</code>,
+	challenges at <code>challenges.example.com</code> or <code>203.0.113.10</code>
+</div>
 
 
-	<div class="alert alert-info mb-3">
-		<i class="fas fa-cog"></i> <strong>Global Settings:</strong> These settings apply to ALL container challenges. 
-		Individual challenges no longer have separate timeout/resource limits - they all use these global values.
-	</div>
+<div class="alert alert-info mb-3">
+	<i class="fas fa-cog"></i> <strong>Global Settings:</strong> These settings apply to ALL container challenges.
+	Individual challenges no longer have separate timeout/resource limits - they all use these global values.
+</div>
 
-	<form id="settings-form">
-		<div class="card">
-			<div class="card-header">
-				<h5>Docker Configuration</h5>
-			</div>
-			<div class="card-body">
-				<div class="form-group">
-					<label>Docker Connection Type</label>
-					<div>
-						<div class="form-check form-check-inline">
-							<input class="form-check-input" type="radio" name="docker_type" id="docker_type_local" value="local" {{ 'checked' if settings.docker_type == 'local' or not settings.docker_type else '' }}>
-							<label class="form-check-label" for="docker_type_local">
-								<i class="fas fa-server"></i> Local Docker
-							</label>
-						</div>
-						<div class="form-check form-check-inline">
-							<input class="form-check-input" type="radio" name="docker_type" id="docker_type_ssh" value="ssh" {{ 'checked' if settings.docker_type == 'ssh' else '' }}>
-							<label class="form-check-label" for="docker_type_ssh">
-								<i class="fas fa-network-wired"></i> Remote SSH
-							</label>
-						</div>
-					</div>
-				</div>
-
-				<!-- SSH Configuration -->
-				<div id="ssh-config-section" style="display: none;">
-					<hr>
-					<h6><i class="fas fa-key"></i> SSH Configuration</h6>
-					
-					<div class="form-row">
-						<div class="form-group col-md-8">
-							<label for="ssh_hostname">Hostname / IP Address</label>
-							<input class="form-control" type="text" name="ssh_hostname" id="ssh_hostname"
-								placeholder="192.168.1.100 or docker.example.com"
-								value="{{ settings.ssh_hostname }}">
-						</div>
-						<div class="form-group col-md-4">
-							<label for="ssh_port">Port</label>
-							<input class="form-control" type="number" name="ssh_port" id="ssh_port"
-								placeholder="22" value="{{ settings.ssh_port or '22' }}">
-						</div>
-					</div>
-
-					<div class="form-group">
-						<label for="ssh_user">SSH User</label>
-						<input class="form-control" type="text" name="ssh_user" id="ssh_user"
-							placeholder="root" value="{{ settings.ssh_user or 'root' }}">
-					</div>
-
-					<div class="form-group">
-						<label for="ssh_key_content">SSH Private Key</label>
-						<textarea class="form-control" name="ssh_key_content" id="ssh_key_content" rows="8"
-							placeholder="-----BEGIN OPENSSH PRIVATE KEY-----\n...">{{ settings.ssh_key_content }}</textarea>
-						<small class="form-text text-muted">
-							Paste your SSH private key here (ed25519, RSA, etc.)
-						</small>
-					</div>
-
-					<div class="form-group">
-						<label for="ssh_known_hosts">Known Hosts Entry</label>
-						<textarea class="form-control" name="ssh_known_hosts" id="ssh_known_hosts" rows="3"
-							placeholder="192.168.1.100 ssh-ed25519 AAAA...">{{ settings.ssh_known_hosts }}</textarea>
-						<small class="form-text text-muted">
-							Paste the known_hosts entry for the remote server. Get it with: <code>ssh-keyscan hostname</code>
-						</small>
-					</div>
-				</div>
-
-				<div class="form-group">
-					<label for="docker_hostname">Connection Hostname (for users)</label>
-					<input class="form-control" type="text" name="connection_host" id="docker_hostname"
-						placeholder="example.com or 10.0.1.8"
-						value="{{ settings.docker_hostname }}">
-					<small class="form-text text-muted">
-						Hostname displayed to users in connection strings
-					</small>
-				</div>
-
-				<div class="form-group">
-					<label for="container_expiration">Default Container Timeout (minutes)</label>
-					<input class="form-control" type="number" name="default_timeout" id="container_expiration"
-						placeholder="30" value="{{ settings.container_expiration }}">
-					<small class="form-text text-muted">
-						How long containers run before auto-termination (0 = never)
-					</small>
-				</div>
-
-				<div class="form-group">
-					<label for="max_renewals">Default Max Renewals</label>
-					<input class="form-control" type="number" name="max_renewals" id="max_renewals"
-						placeholder="3" value="{{ settings.max_renewals }}">
-					<small class="form-text text-muted">
-						Maximum number of times users can extend container lifetime
-					</small>
-				</div>
-
-				<div class="form-group">
-					<label for="container_maxmemory">Max Memory per Container</label>
-					<input class="form-control" type="text" name="max_memory" id="container_maxmemory"
-						placeholder="512m" value="{{ settings.container_maxmemory }}">
-					<small class="form-text text-muted">
-						e.g., 512m, 1g
-					</small>
-				</div>
-
-				<div class="form-group">
-					<label for="container_maxcpu">Max CPUs per Container</label>
-					<input class="form-control" type="text" name="max_cpu" id="container_maxcpu"
-						placeholder="1.0" value="{{ settings.container_maxcpu }}">
-					<small class="form-text text-muted">
-						Float value, e.g., 1.5 means 1.5 cores maximum
-					</small>
-				</div>
-			</div>
+<form id="settings-form">
+	<div class="card">
+		<div class="card-header">
+			<h5>Docker Configuration</h5>
 		</div>
-
-		<div class="card mt-3">
-			<div class="card-header">
-				<h5>Port Configuration</h5>
+		<div class="card-body">
+			<div class="form-group">
+				<label>Docker Connection Type</label>
+				<div>
+					<div class="form-check form-check-inline">
+						<input class="form-check-input" type="radio" name="docker_type" id="docker_type_local"
+							value="local" {{ 'checked' if settings.docker_type=='local' or not settings.docker_type
+							else '' }}>
+						<label class="form-check-label" for="docker_type_local">
+							<i class="fas fa-server"></i> Local Docker
+						</label>
+					</div>
+					<div class="form-check form-check-inline">
+						<input class="form-check-input" type="radio" name="docker_type" id="docker_type_ssh" value="ssh"
+							{{ 'checked' if settings.docker_type=='ssh' else '' }}>
+						<label class="form-check-label" for="docker_type_ssh">
+							<i class="fas fa-network-wired"></i> Remote SSH
+						</label>
+					</div>
+				</div>
 			</div>
-			<div class="card-body">
+
+			<!-- SSH Configuration -->
+			<div id="ssh-config-section" style="display: none;">
+				<hr>
+				<h6><i class="fas fa-key"></i> SSH Configuration</h6>
+
 				<div class="form-row">
-					<div class="form-group col-md-6">
-						<label for="port_range_start">Port Range Start</label>
-						<input class="form-control" type="number" name="port_range_start" id="port_range_start"
-							placeholder="30000" value="{{ settings.port_range_start }}">
-						<small class="form-text text-muted">
-							Starting port for container allocation
-						</small>
+					<div class="form-group col-md-8">
+						<label for="ssh_hostname">Hostname / IP Address</label>
+						<input class="form-control" type="text" name="ssh_hostname" id="ssh_hostname"
+							placeholder="192.168.1.100 or docker.example.com" value="{{ settings.ssh_hostname }}">
 					</div>
-					<div class="form-group col-md-6">
-						<label for="port_range_end">Port Range End</label>
-						<input class="form-control" type="number" name="port_range_end" id="port_range_end"
-							placeholder="31000" value="{{ settings.port_range_end }}">
-						<small class="form-text text-muted">
-							Ending port for container allocation
-						</small>
+					<div class="form-group col-md-4">
+						<label for="ssh_port">Port</label>
+						<input class="form-control" type="number" name="ssh_port" id="ssh_port" placeholder="22"
+							value="{{ settings.ssh_port or '22' }}">
 					</div>
 				</div>
+
+				<div class="form-group">
+					<label for="ssh_user">SSH User</label>
+					<input class="form-control" type="text" name="ssh_user" id="ssh_user" placeholder="root"
+						value="{{ settings.ssh_user or 'root' }}">
+				</div>
+
+				<div class="form-group">
+					<label for="ssh_key_content">SSH Private Key</label>
+					<textarea class="form-control" name="ssh_key_content" id="ssh_key_content" rows="8"
+						placeholder="-----BEGIN OPENSSH PRIVATE KEY-----\n...">{{ settings.ssh_key_content }}</textarea>
+					<small class="form-text text-muted">
+						Paste your SSH private key here (ed25519, RSA, etc.)
+					</small>
+				</div>
+
+				<div class="form-group">
+					<label for="ssh_known_hosts">Known Hosts Entry</label>
+					<textarea class="form-control" name="ssh_known_hosts" id="ssh_known_hosts" rows="3"
+						placeholder="192.168.1.100 ssh-ed25519 AAAA...">{{ settings.ssh_known_hosts }}</textarea>
+					<small class="form-text text-muted">
+						Paste the known_hosts entry for the remote server. Get it with:
+						<code>ssh-keyscan hostname</code>
+					</small>
+				</div>
+			</div>
+
+			<div class="form-group">
+				<label for="docker_hostname">Connection Hostname (for users)</label>
+				<input class="form-control" type="text" name="connection_host" id="docker_hostname"
+					placeholder="example.com or 10.0.1.8" value="{{ settings.docker_hostname }}">
+				<small class="form-text text-muted">
+					Hostname displayed to users in connection strings
+				</small>
+			</div>
+
+			<div class="form-group">
+				<label for="container_expiration">Default Container Timeout (minutes)</label>
+				<input class="form-control" type="number" name="default_timeout" id="container_expiration"
+					placeholder="30" value="{{ settings.container_expiration }}">
+				<small class="form-text text-muted">
+					How long containers run before auto-termination (0 = never)
+				</small>
+			</div>
+
+			<div class="form-group">
+				<label for="max_renewals">Default Max Renewals</label>
+				<input class="form-control" type="number" name="max_renewals" id="max_renewals" placeholder="3"
+					value="{{ settings.max_renewals }}">
+				<small class="form-text text-muted">
+					Maximum number of times users can extend container lifetime
+				</small>
+			</div>
+
+			<div class="form-group">
+				<label for="container_maxmemory">Max Memory per Container</label>
+				<input class="form-control" type="text" name="max_memory" id="container_maxmemory" placeholder="512m"
+					value="{{ settings.container_maxmemory }}">
+				<small class="form-text text-muted">
+					e.g., 512m, 1g
+				</small>
+			</div>
+
+			<div class="form-group">
+				<label for="container_maxcpu">Max CPUs per Container</label>
+				<input class="form-control" type="text" name="max_cpu" id="container_maxcpu" placeholder="1.0"
+					value="{{ settings.container_maxcpu }}">
+				<small class="form-text text-muted">
+					Float value, e.g., 1.5 means 1.5 cores maximum
+				</small>
+			</div>
+		</div>
+	</div>
+
+	<div class="card mt-3">
+		<div class="card-header">
+			<h5>Port Configuration</h5>
+		</div>
+		<div class="card-body">
+			<div class="form-row">
+				<div class="form-group col-md-6">
+					<label for="port_range_start">Port Range Start</label>
+					<input class="form-control" type="number" name="port_range_start" id="port_range_start"
+						placeholder="30000" value="{{ settings.port_range_start }}">
+					<small class="form-text text-muted">
+						Starting port for container allocation
+					</small>
+				</div>
+				<div class="form-group col-md-6">
+					<label for="port_range_end">Port Range End</label>
+					<input class="form-control" type="number" name="port_range_end" id="port_range_end"
+						placeholder="31000" value="{{ settings.port_range_end }}">
+					<small class="form-text text-muted">
+						Ending port for container allocation
+					</small>
+				</div>
+			</div>
+			<div class="alert alert-warning">
+				<i class="fas fa-exclamation-triangle"></i> <strong>Note:</strong>
+				Make sure these ports are open in your firewall and not used by other services.
+				Port range: {{ settings.port_range_start }} - {{ settings.port_range_end }}
+				(Total: {{ (settings.port_range_end|int - settings.port_range_start|int) }} ports available)
+			</div>
+		</div>
+	</div>
+
+	<div class="card mt-3">
+		<div class="card-header">
+			<h5><i class="fas fa-globe"></i> Subdomain Routing (Traefik)</h5>
+		</div>
+		<div class="card-body">
+			<div class="alert alert-info">
+				<i class="fas fa-info-circle"></i> Enable subdomain routing for web challenges.
+				Each container gets a unique subdomain (e.g., <code>abc123.challenges.example.com</code>).
+				Requires Traefik as reverse proxy.
+			</div>
+
+			<div class="form-group">
+				<div class="form-check">
+					<input class="form-check-input" type="checkbox" name="subdomain_enabled" id="subdomain_enabled"
+						value="true" {{ 'checked' if settings.subdomain_enabled=='true' else '' }}>
+					<label class="form-check-label" for="subdomain_enabled">
+						<strong>Enable Subdomain Routing</strong>
+					</label>
+				</div>
+				<small class="form-text text-muted">
+					When enabled, challenges with connection type "http", "https", or "web" will get a random subdomain
+					instead of port-based access.
+				</small>
+			</div>
+
+			<div id="subdomain-config-section" style="display: none;">
+				<hr>
+				<div class="form-group">
+					<label for="subdomain_base_domain">Base Domain</label>
+					<input class="form-control" type="text" name="subdomain_base_domain" id="subdomain_base_domain"
+						placeholder="challenges.example.com" value="{{ settings.subdomain_base_domain }}">
+					<small class="form-text text-muted">
+						Base domain for challenges. Subdomains will be:
+						<code>&lt;random&gt;.challenges.example.com</code>
+						<br>Make sure you have a wildcard DNS record: <code>*.challenges.example.com</code> pointing to
+						your server.
+					</small>
+				</div>
+
+				<div class="form-group">
+					<label for="subdomain_network">Docker Network Name</label>
+					<input class="form-control" type="text" name="subdomain_network" id="subdomain_network"
+						placeholder="ctfd-network" value="{{ settings.subdomain_network or 'ctfd-network' }}">
+					<small class="form-text text-muted">
+						Docker network where Traefik can reach challenge containers.
+					</small>
+				</div>
+
 				<div class="alert alert-warning">
-					<i class="fas fa-exclamation-triangle"></i> <strong>Note:</strong> 
-					Make sure these ports are open in your firewall and not used by other services.
-					Port range: {{ settings.port_range_start }} - {{ settings.port_range_end }} 
-					(Total: {{ (settings.port_range_end|int - settings.port_range_start|int) }} ports available)
+					<i class="fas fa-exclamation-triangle"></i> <strong>Requirements:</strong>
+					<ul class="mb-0 mt-2">
+						<li>Traefik running with Docker provider enabled</li>
+						<li>Wildcard DNS record pointing to your server</li>
+						<li>Challenge containers in the same Docker network as Traefik</li>
+					</ul>
 				</div>
 			</div>
 		</div>
+	</div>
 
 	<div class="form-group mt-3">
 		<button type="submit" class="btn btn-primary">
@@ -180,48 +244,68 @@
 
 {% block scripts %}
 <script>
-// Toggle SSH config section
-function toggleDockerType() {
-	const sshRadio = document.getElementById('docker_type_ssh');
-	const sshSection = document.getElementById('ssh-config-section');
-	
-	if (sshRadio.checked) {
-		sshSection.style.display = 'block';
-	} else {
-		sshSection.style.display = 'none';
-	}
-}
+	// Toggle SSH config section
+	function toggleDockerType() {
+		const sshRadio = document.getElementById('docker_type_ssh');
+		const sshSection = document.getElementById('ssh-config-section');
 
-// Initialize
-document.addEventListener('DOMContentLoaded', function() {
-	toggleDockerType();
-	document.getElementById('docker_type_local').addEventListener('change', toggleDockerType);
-	document.getElementById('docker_type_ssh').addEventListener('change', toggleDockerType);
-});
-
-document.getElementById('settings-form').addEventListener('submit', function(e) {
-	e.preventDefault();
-	const formData = new FormData(this);
-	const data = Object.fromEntries(formData);
-	
-	fetch('{{ url_for("containers_admin.api_config_update") }}', {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json',
-			'CSRF-Token': '{{ Session.nonce }}'
-		},
-		body: JSON.stringify(data)
-	})
-	.then(r => r.json())
-	.then(data => {
-		if (data.success) {
-			alert('Settings saved successfully');
-			location.reload();
+		if (sshRadio.checked) {
+			sshSection.style.display = 'block';
 		} else {
-			alert('Error: ' + (data.error || 'Unknown error'));
+			sshSection.style.display = 'none';
 		}
-	})
-	.catch(e => alert('Network error: ' + e));
-});
+	}
+
+	// Toggle Subdomain config section
+	function toggleSubdomainConfig() {
+		const checkbox = document.getElementById('subdomain_enabled');
+		const section = document.getElementById('subdomain-config-section');
+
+		if (checkbox.checked) {
+			section.style.display = 'block';
+		} else {
+			section.style.display = 'none';
+		}
+	}
+
+	// Initialize
+	document.addEventListener('DOMContentLoaded', function () {
+		toggleDockerType();
+		toggleSubdomainConfig();
+		document.getElementById('docker_type_local').addEventListener('change', toggleDockerType);
+		document.getElementById('docker_type_ssh').addEventListener('change', toggleDockerType);
+		document.getElementById('subdomain_enabled').addEventListener('change', toggleSubdomainConfig);
+	});
+
+	document.getElementById('settings-form').addEventListener('submit', function (e) {
+		e.preventDefault();
+		const formData = new FormData(this);
+
+		// Fix: Checkboxes are not included if unchecked, so we manually add them
+		if (!document.getElementById('subdomain_enabled').checked) {
+			formData.append('subdomain_enabled', 'false');
+		}
+
+		const data = Object.fromEntries(formData);
+
+		fetch('{{ url_for("containers_admin.api_config_update") }}', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'CSRF-Token': '{{ Session.nonce }}'
+			},
+			body: JSON.stringify(data)
+		})
+			.then(r => r.json())
+			.then(data => {
+				if (data.success) {
+					alert('Settings saved successfully');
+					location.reload();
+				} else {
+					alert('Error: ' + (data.error || 'Unknown error'));
+				}
+			})
+			.catch(e => alert('Network error: ' + e));
+	});
 </script>
 {% endblock %}

@@ -70,7 +70,9 @@ class DockerService:
         cpu_limit: float = 0.5,
         pids_limit: int = 100,
         labels: Dict[str, str] = None,
-        name: str = None
+        name: str = None,
+        network: str = None,  # Network to connect for Traefik routing
+        use_traefik: bool = False  # If True, don't expose host port (Traefik handles routing)
     ) -> Dict[str, Any]:
         """
         Create and start a container
@@ -78,7 +80,7 @@ class DockerService:
         Args:
             image: Docker image name
             internal_port: Port inside container
-            host_port: Port on host to expose
+            host_port: Port on host to expose (ignored if use_traefik=True)
             command: Command to run
             environment: Environment variables
             memory_limit: Memory limit (e.g., "512m", "1g")
@@ -86,6 +88,8 @@ class DockerService:
             pids_limit: Max number of processes
             labels: Labels for the container
             name: Container name (optional)
+            network: Docker network to connect (for Traefik routing)
+            use_traefik: If True, use Traefik for routing instead of host port
         
         Returns:
             {
@@ -109,6 +113,17 @@ class DockerService:
                 'ctfd.plugin': 'containers'
             })
             
+            # Port mapping - only if not using Traefik
+            ports = None if use_traefik else {f'{internal_port}/tcp': host_port}
+            
+            # Network mode
+            network_mode = None
+            if use_traefik and network:
+                # Will connect to network after creation
+                network_mode = None
+            else:
+                network_mode = 'bridge'
+            
             # Create container
             container = self.client.containers.run(
                 image=image,
@@ -116,19 +131,28 @@ class DockerService:
                 command=command,
                 detach=True,
                 auto_remove=True,  # Auto remove when container stops/fails
-                ports={f'{internal_port}/tcp': host_port},
+                ports=ports,
                 environment=environment or {},
                 mem_limit=memory_limit,
                 cpu_quota=cpu_quota,
                 cpu_period=cpu_period,
                 pids_limit=pids_limit,
                 labels=container_labels,
-                network_mode='bridge',
+                network_mode=network_mode,
                 # Security options
                 cap_drop=['ALL'],  # Drop all capabilities
                 cap_add=['CHOWN', 'SETUID', 'SETGID'],  # Add back minimal caps
                 security_opt=['no-new-privileges'],
             )
+            
+            # Connect to custom network if specified (for Traefik)
+            if network:
+                try:
+                    docker_network = self.client.networks.get(network)
+                    docker_network.connect(container)
+                    logger.info(f"Connected container {container.id[:12]} to network {network}")
+                except Exception as e:
+                    logger.warning(f"Failed to connect to network {network}: {e}")
             
             logger.info(f"Created container {container.id[:12]} from image {image}")
             

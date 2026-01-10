@@ -131,19 +131,46 @@ class ContainerService:
             challenge: ContainerChallenge object
             flag: Plain text flag
         """
+        import uuid as uuid_module
+        
         # Update status
         instance.status = 'provisioning'
         db.session.commit()
         
         try:
-            # 1. Allocate port
+            # Get config
+            from ..models.config import ContainerConfig
+            
+            # Check if subdomain routing is enabled
+            subdomain_enabled = ContainerConfig.get('subdomain_enabled', 'false').lower() == 'true'
+            subdomain_base_domain = ContainerConfig.get('subdomain_base_domain', '')
+            subdomain_network = ContainerConfig.get('subdomain_network', 'ctfd-network')
+            
+            # Determine if this challenge should use subdomain routing
+            # Only for HTTP/web challenges
+            use_subdomain = (
+                subdomain_enabled and 
+                subdomain_base_domain and
+                challenge.container_connection_type in ('http', 'https', 'web')
+            )
+            
+            # 1. Allocate port (still needed for fallback or non-web challenges)
             host_port = self.port_manager.allocate_port()
             
             # 2. Get connection host
-            from ..models.config import ContainerConfig
             connection_host = ContainerConfig.get('connection_host', 'localhost')
             
-            # 3. Create Docker container
+            # 3. Generate subdomain if enabled
+            subdomain = None
+            full_hostname = None
+            if use_subdomain:
+                # Generate random 8-char subdomain with prefix format for Cloudflare Free SSL
+                # Format: c-{random}.domain.com (single level, compatible with free SSL)
+                subdomain = f"c-{uuid_module.uuid4().hex[:8]}"
+                full_hostname = f"{subdomain}.{subdomain_base_domain}"
+                logger.info(f"Generated subdomain: {full_hostname}")
+            
+            # 4. Create Docker container
             # Generate container name: challengename_accountid
             import re
             # Sanitize challenge name (only alphanumeric and hyphens)
@@ -155,6 +182,24 @@ class ContainerService:
             if command and '{FLAG}' in command:
                 command = command.replace('{FLAG}', flag)
             
+            # Base labels
+            labels = {
+                'ctfd.instance_uuid': instance.uuid,
+                'ctfd.challenge_id': str(challenge.id),
+                'ctfd.account_id': str(instance.account_id),
+                'ctfd.expires_at': str(instance.expires_at.timestamp())
+            }
+            
+            # Add Traefik labels if subdomain routing is enabled
+            if use_subdomain:
+                router_name = f"ctfd-{instance.uuid[:8]}"
+                labels.update({
+                    'traefik.enable': 'true',
+                    f'traefik.http.routers.{router_name}.rule': f'Host(`{full_hostname}`)',
+                    f'traefik.http.routers.{router_name}.entrypoints': 'web',
+                    f'traefik.http.services.{router_name}.loadbalancer.server.port': str(challenge.internal_port),
+                })
+            
             result = self.docker.create_container(
                 image=challenge.image,
                 internal_port=challenge.internal_port,
@@ -165,28 +210,38 @@ class ContainerService:
                 cpu_limit=challenge.get_cpu_limit(),
                 pids_limit=challenge.pids_limit,
                 name=container_name,
-                labels={
-                    'ctfd.instance_uuid': instance.uuid,
-                    'ctfd.challenge_id': str(challenge.id),
-                    'ctfd.account_id': str(instance.account_id),
-                    'ctfd.expires_at': str(instance.expires_at.timestamp())
-                }
+                labels=labels,
+                network=subdomain_network if use_subdomain else None,
+                use_traefik=use_subdomain
             )
             
-            # 4. Update instance
+            # 5. Update instance
             instance.container_id = result['container_id']
-            instance.connection_host = connection_host
             instance.connection_port = host_port
-            instance.connection_info = {
-                'type': challenge.container_connection_type,
-                'info': challenge.container_connection_info
-            }
+            
+            if use_subdomain:
+                # For subdomain routing: store URL
+                instance.connection_host = full_hostname
+                instance.connection_info = {
+                    'type': 'url',
+                    'url': f"https://{full_hostname}",
+                    'subdomain': subdomain,
+                    'info': challenge.container_connection_info
+                }
+            else:
+                # For port-based routing: store host:port
+                instance.connection_host = connection_host
+                instance.connection_info = {
+                    'type': challenge.container_connection_type,
+                    'info': challenge.container_connection_info
+                }
+            
             instance.status = 'running'
             instance.started_at = datetime.utcnow()
             
             db.session.commit()
             
-            # 5. Schedule expiration in Redis (for accurate killing)
+            # 6. Schedule expiration in Redis (for accurate killing)
             try:
                 from .. import redis_expiration_service
                 if redis_expiration_service:
@@ -199,6 +254,8 @@ class ContainerService:
                 logger.warning(f"Failed to schedule Redis expiration: {e}")
             
             logger.info(f"Provisioned container {result['container_id'][:12]} for instance {instance.uuid}")
+            if use_subdomain:
+                logger.info(f"Subdomain routing: https://{subdomain}.{subdomain_base_domain}")
             
             # Audit log
             self._create_audit_log(
@@ -208,7 +265,8 @@ class ContainerService:
                 account_id=instance.account_id,
                 details={
                     'container_id': result['container_id'],
-                    'port': host_port
+                    'port': host_port,
+                    'subdomain': subdomain if use_subdomain else None
                 }
             )
             
