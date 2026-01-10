@@ -10,6 +10,8 @@ A comprehensive CTFd plugin that enables dynamic Docker container challenges wit
 - **Resource Control**: Global limits for CPU, memory, and process count
 - **Port Management**: Automatic port allocation and mapping
 - **Custom Naming**: Containers named as `challengename_accountid` for easy identification
+- **Subdomain routing**: Generate subdomain for each WEB challenge. Read more [here](./SUBDOMAIN_INFO.md)
+
 
 ### Anti-Cheat System
 - **Flag Reuse Detection**: Automatically detects when teams share flags
