@@ -416,6 +416,8 @@ def load(app: Flask):
     try:
         # Docker service - Try to initialize but don't fail if socket unavailable
         docker_socket = ContainerConfig.get('docker_socket', 'unix://var/run/docker.sock')
+        
+        # docker-py handles SSH URLs directly
         docker_service = DockerService(base_url=docker_socket)
         
         # Test connection but don't fail plugin load if unavailable
@@ -423,13 +425,13 @@ def load(app: Flask):
             logger.info(f"Docker service initialized and connected: {docker_socket}")
         else:
             logger.warning(f"Docker service initialized but not connected: {docker_socket}")
-            logger.warning("Plugin loaded successfully. Configure Docker socket in Admin → Containers → Settings")
+            logger.warning("Plugin loaded successfully. Configure Docker in Admin → Containers → Settings")
     except Exception as e:
         logger.warning(f"Docker service initialization failed: {e}")
-        logger.warning("Plugin loaded successfully. Configure Docker socket in Admin → Containers → Settings")
+        logger.warning("Plugin loaded successfully. Configure Docker in Admin → Containers → Settings")
         # Create a dummy docker service that will fail gracefully
         try:
-            docker_service = DockerService(base_url=docker_socket)
+            docker_service = DockerService(base_url=docker_socket if 'docker_socket' in locals() else 'unix://var/run/docker.sock')
         except:
             docker_service = None
     

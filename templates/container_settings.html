@@ -26,17 +26,69 @@
 			</div>
 			<div class="card-body">
 				<div class="form-group">
-					<label for="docker_base_url">Docker Socket URL</label>
-					<input class="form-control" type="text" name="docker_socket" id="docker_base_url"
-						placeholder="unix://var/run/docker.sock or ssh://root@example.com"
-						value="{{ settings.docker_base_url }}">
-					<small class="form-text text-muted">
-						The local socket address or remote SSH address for Docker daemon
-					</small>
+					<label>Docker Connection Type</label>
+					<div>
+						<div class="form-check form-check-inline">
+							<input class="form-check-input" type="radio" name="docker_type" id="docker_type_local" value="local" {{ 'checked' if settings.docker_type == 'local' or not settings.docker_type else '' }}>
+							<label class="form-check-label" for="docker_type_local">
+								<i class="fas fa-server"></i> Local Docker
+							</label>
+						</div>
+						<div class="form-check form-check-inline">
+							<input class="form-check-input" type="radio" name="docker_type" id="docker_type_ssh" value="ssh" {{ 'checked' if settings.docker_type == 'ssh' else '' }}>
+							<label class="form-check-label" for="docker_type_ssh">
+								<i class="fas fa-network-wired"></i> Remote SSH
+							</label>
+						</div>
+					</div>
+				</div>
+
+				<!-- SSH Configuration -->
+				<div id="ssh-config-section" style="display: none;">
+					<hr>
+					<h6><i class="fas fa-key"></i> SSH Configuration</h6>
+					
+					<div class="form-row">
+						<div class="form-group col-md-8">
+							<label for="ssh_hostname">Hostname / IP Address</label>
+							<input class="form-control" type="text" name="ssh_hostname" id="ssh_hostname"
+								placeholder="192.168.1.100 or docker.example.com"
+								value="{{ settings.ssh_hostname }}">
+						</div>
+						<div class="form-group col-md-4">
+							<label for="ssh_port">Port</label>
+							<input class="form-control" type="number" name="ssh_port" id="ssh_port"
+								placeholder="22" value="{{ settings.ssh_port or '22' }}">
+						</div>
+					</div>
+
+					<div class="form-group">
+						<label for="ssh_user">SSH User</label>
+						<input class="form-control" type="text" name="ssh_user" id="ssh_user"
+							placeholder="root" value="{{ settings.ssh_user or 'root' }}">
+					</div>
+
+					<div class="form-group">
+						<label for="ssh_key_content">SSH Private Key</label>
+						<textarea class="form-control" name="ssh_key_content" id="ssh_key_content" rows="8"
+							placeholder="-----BEGIN OPENSSH PRIVATE KEY-----\n...">{{ settings.ssh_key_content }}</textarea>
+						<small class="form-text text-muted">
+							Paste your SSH private key here (ed25519, RSA, etc.)
+						</small>
+					</div>
+
+					<div class="form-group">
+						<label for="ssh_known_hosts">Known Hosts Entry</label>
+						<textarea class="form-control" name="ssh_known_hosts" id="ssh_known_hosts" rows="3"
+							placeholder="192.168.1.100 ssh-ed25519 AAAA...">{{ settings.ssh_known_hosts }}</textarea>
+						<small class="form-text text-muted">
+							Paste the known_hosts entry for the remote server. Get it with: <code>ssh-keyscan hostname</code>
+						</small>
+					</div>
 				</div>
 
 				<div class="form-group">
-					<label for="docker_hostname">Connection Hostname</label>
+					<label for="docker_hostname">Connection Hostname (for users)</label>
 					<input class="form-control" type="text" name="connection_host" id="docker_hostname"
 						placeholder="example.com or 10.0.1.8"
 						value="{{ settings.docker_hostname }}">
@@ -128,6 +180,25 @@
 
 {% block scripts %}
 <script>
+// Toggle SSH config section
+function toggleDockerType() {
+	const sshRadio = document.getElementById('docker_type_ssh');
+	const sshSection = document.getElementById('ssh-config-section');
+	
+	if (sshRadio.checked) {
+		sshSection.style.display = 'block';
+	} else {
+		sshSection.style.display = 'none';
+	}
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+	toggleDockerType();
+	document.getElementById('docker_type_local').addEventListener('change', toggleDockerType);
+	document.getElementById('docker_type_ssh').addEventListener('change', toggleDockerType);
+});
+
 document.getElementById('settings-form').addEventListener('submit', function(e) {
 	e.preventDefault();
 	const formData = new FormData(this);

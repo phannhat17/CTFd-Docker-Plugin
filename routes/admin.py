@@ -115,6 +115,12 @@ def settings():
     """Settings page"""
     # Get all config values
     settings_data = {
+        'docker_type': ContainerConfig.get('docker_type', 'local'),
+        'ssh_hostname': ContainerConfig.get('ssh_hostname', ''),
+        'ssh_port': ContainerConfig.get('ssh_port', '22'),
+        'ssh_user': ContainerConfig.get('ssh_user', 'root'),
+        'ssh_key_content': ContainerConfig.get('ssh_key_content', ''),
+        'ssh_known_hosts': ContainerConfig.get('ssh_known_hosts', ''),
         'docker_base_url': ContainerConfig.get('docker_socket', ''),
         'docker_hostname': ContainerConfig.get('connection_host', ''),
         'container_expiration': ContainerConfig.get('default_timeout', '60'),
@@ -395,31 +401,122 @@ def get_config():
 @admins_only
 def update_config():
     """
-    Update plugin configuration
-    
-    Body:
-        {
-            "docker_socket": "unix://var/run/docker.sock",
-            "connection_host": "ctf.example.com",
-            "port_range_start": 30000,
-            "port_range_end": 31000
-        }
+    Update plugin configuration and create SSH config if needed
     """
     try:
+        import os
         data = request.get_json()
         
-        # Update config
+        # Update all config
         for key, value in data.items():
             ContainerConfig.set(key, str(value))
         
-        # Reconnect Docker if socket changed
-        if 'docker_socket' in data:
-            docker_service.base_url = data['docker_socket']
+        # Handle Docker connection based on type
+        docker_type = data.get('docker_type', 'local')
+        
+        if docker_type == 'ssh':
+            # Create SSH config files
+            ssh_dir = os.path.expanduser('~/.ssh')
+            os.makedirs(ssh_dir, exist_ok=True)
+            
+            ssh_hostname = data.get('ssh_hostname', '')
+            ssh_port = data.get('ssh_port', '22')
+            ssh_user = data.get('ssh_user', 'root')
+            ssh_key_content = data.get('ssh_key_content', '')
+            ssh_known_hosts = data.get('ssh_known_hosts', '')
+            
+            if not ssh_hostname:
+                return jsonify({'error': 'SSH hostname is required'}), 400
+            
+            # Create unique host alias
+            host_alias = f"ctfd-docker-{ssh_hostname.replace('.', '-')}"
+            
+            # Write SSH private key
+            key_path = os.path.join(ssh_dir, f'{host_alias}_key')
+            if ssh_key_content:
+                with open(key_path, 'w') as f:
+                    f.write(ssh_key_content)
+                os.chmod(key_path, 0o600)
+            
+            # Write/update known_hosts
+            known_hosts_path = os.path.join(ssh_dir, 'known_hosts')
+            if ssh_known_hosts:
+                # Read existing known_hosts
+                existing_hosts = []
+                if os.path.exists(known_hosts_path):
+                    with open(known_hosts_path, 'r') as f:
+                        existing_hosts = f.readlines()
+                
+                # Remove old entries for this host
+                existing_hosts = [line for line in existing_hosts if ssh_hostname not in line]
+                
+                # Add new entry
+                existing_hosts.append(ssh_known_hosts.strip() + '\n')
+                
+                # Write back
+                with open(known_hosts_path, 'w') as f:
+                    f.writelines(existing_hosts)
+                os.chmod(known_hosts_path, 0o644)
+            
+            # Create/update SSH config
+            config_path = os.path.join(ssh_dir, 'config')
+            
+            # Read existing config
+            existing_config = []
+            if os.path.exists(config_path):
+                with open(config_path, 'r') as f:
+                    existing_config = f.readlines()
+            
+            # Remove old config for this host alias
+            new_config = []
+            skip_until_next_host = False
+            for line in existing_config:
+                if line.strip().startswith('Host ') and host_alias in line:
+                    skip_until_next_host = True
+                elif line.strip().startswith('Host ') and host_alias not in line:
+                    skip_until_next_host = False
+                
+                if not skip_until_next_host:
+                    new_config.append(line)
+            
+            # Add new config
+            new_config.append('\n')
+            new_config.append('# CTFd Docker Plugin - Auto-generated\n')
+            new_config.append(f'Host {host_alias}\n')
+            new_config.append(f'    HostName {ssh_hostname}\n')
+            new_config.append(f'    User {ssh_user}\n')
+            new_config.append(f'    Port {ssh_port}\n')
+            if ssh_key_content:
+                new_config.append(f'    IdentityFile {key_path}\n')
+            new_config.append(f'    StrictHostKeyChecking yes\n')
+            new_config.append(f'    UserKnownHostsFile {known_hosts_path}\n')
+            
+            # Write config
+            with open(config_path, 'w') as f:
+                f.writelines(new_config)
+            os.chmod(config_path, 0o644)
+            
+            # Update docker socket URL to use SSH alias
+            docker_socket = f'ssh://{host_alias}'
+            ContainerConfig.set('docker_socket', docker_socket)
+            
+            # Reconnect Docker
+            docker_service.base_url = docker_socket
+            docker_service._connect()
+        else:
+            # Local docker
+            docker_socket = 'unix://var/run/docker.sock'
+            ContainerConfig.set('docker_socket', docker_socket)
+            
+            # Reconnect Docker
+            docker_service.base_url = docker_socket
             docker_service._connect()
         
         return jsonify({'success': True})
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 

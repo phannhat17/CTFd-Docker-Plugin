@@ -21,6 +21,7 @@ class DockerService:
             base_url: Docker daemon URL
                      - Unix socket: 'unix://var/run/docker.sock' (default)
                      - TCP: 'tcp://192.168.1.100:2376'
+                     - SSH: 'ssh://user@host:port' or 'ssh://user@host' (default port 22)
         """
         self.base_url = base_url
         self.client = None
@@ -29,7 +30,17 @@ class DockerService:
     def _connect(self):
         """Connect to Docker daemon - Don't raise exception, just log warning"""
         try:
-            self.client = docker.DockerClient(base_url=self.base_url, timeout=10)
+            # Handle SSH connection
+            if self.base_url.startswith('ssh://'):
+                logger.info(f"Attempting SSH connection to Docker: {self.base_url}")
+                # docker-py supports ssh:// URLs directly
+                # Format: ssh://user@host:port or ssh://user@host (default port 22)
+                # SSH keys will be used from ~/.ssh/ or SSH agent
+                self.client = docker.DockerClient(base_url=self.base_url, timeout=30)
+            else:
+                # Regular connection (Unix socket or TCP)
+                self.client = docker.DockerClient(base_url=self.base_url, timeout=10)
+            
             self.client.ping()
             logger.info(f"Connected to Docker daemon at {self.base_url}")
         except Exception as e:
