@@ -21,20 +21,38 @@ class PortManager:
         Initialize port manager
         
         Args:
-            port_range_start: Start of port range
-            port_range_end: End of port range
+            port_range_start: Start of port range (fallback if config not set)
+            port_range_end: End of port range (fallback if config not set)
         """
-        self.port_range_start = port_range_start
-        self.port_range_end = port_range_end
+        self._default_start = port_range_start
+        self._default_end = port_range_end
+    
+    def _get_port_range(self):
+        """
+        Get current port range from config
         
-        # Load from config
+        This is called on each operation to ensure admin changes
+        take effect immediately without restart
+        """
         config_start = ContainerConfig.get('port_range_start')
         config_end = ContainerConfig.get('port_range_end')
         
-        if config_start:
-            self.port_range_start = int(config_start)
-        if config_end:
-            self.port_range_end = int(config_end)
+        start = int(config_start) if config_start else self._default_start
+        end = int(config_end) if config_end else self._default_end
+        
+        return start, end
+    
+    @property
+    def port_range_start(self):
+        """Get current port range start from config"""
+        start, _ = self._get_port_range()
+        return start
+    
+    @property
+    def port_range_end(self):
+        """Get current port range end from config"""
+        _, end = self._get_port_range()
+        return end
     
     def allocate_port(self) -> int:
         """
@@ -48,6 +66,9 @@ class PortManager:
         """
         from ..models.instance import ContainerInstance
         
+        # Get current port range from config (reloads each time)
+        start, end = self._get_port_range()
+        
         # Get all ports currently in use by running instances
         used_ports = db.session.query(ContainerInstance.connection_port).filter(
             ContainerInstance.status.in_(['running', 'provisioning', 'stopping']),
@@ -57,12 +78,12 @@ class PortManager:
         used_ports_set = {port[0] for port in used_ports if port[0]}
         
         # Find first available port
-        for port in range(self.port_range_start, self.port_range_end + 1):
+        for port in range(start, end + 1):
             if port not in used_ports_set:
                 logger.info(f"Allocated port {port}")
                 return port
         
-        raise Exception(f"No available ports in range {self.port_range_start}-{self.port_range_end}")
+        raise Exception(f"No available ports in range {start}-{end}")
     
     def release_port(self, port: int):
         """
@@ -79,10 +100,13 @@ class PortManager:
         """Get number of available ports"""
         from ..models.instance import ContainerInstance
         
+        # Get current port range from config (reloads each time)
+        start, end = self._get_port_range()
+        
         used_count = db.session.query(ContainerInstance).filter(
             ContainerInstance.status.in_(['running', 'provisioning', 'stopping']),
             ContainerInstance.connection_port.isnot(None)
         ).count()
         
-        total_ports = self.port_range_end - self.port_range_start + 1
+        total_ports = end - start + 1
         return total_ports - used_count
