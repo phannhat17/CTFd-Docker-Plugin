@@ -143,7 +143,6 @@ Access admin panel: **Admin → Plugin → Containers → Settings**
 ```csv
 name,category,description,image,internal_port,command,connection_type,connection_info,flag_pattern,scoring_type,value,initial,decay,minimum,decay_function,state
 Web Challenge,Web,Find the flag in web app,nginx:latest,80,,http,Access via browser,CTF{web_<ran_8>},dynamic,,500,25,100,logarithmic,visible
-SSH Challenge,Pwn,Get root access,ubuntu:20.04,22,/usr/sbin/sshd -D,ssh,user:ctf pass:ctf,CTF{ssh_<ran_16>},dynamic,,500,20,100,logarithmic,visible
 Simple Challenge,Misc,Easy one,alpine:latest,22,,tcp,Just connect,CTF{static_flag},standard,50,,,,standard,visible
 ```
 
@@ -214,26 +213,7 @@ Shows all detected flag-sharing attempts with:
 
 ## Roadmap
 
-### Version 1.1
-- [ ] UI/UX improvements
-  - Enhanced challenge creation interface
-  - Improved container status visualizations
-  - Better mobile responsiveness
-- [ ] Admin dashboard enhancements
-  - Advanced filtering and search
-  - Monitor container logs
-  - Container resource usage graphs
-
-### Version 2.0
-- [ ] Remote Docker connection support
-  - Docker HTTP API support (TCP connection)
-  - Docker agent for remote host management
-  - Multi-host
-  - Secure TLS certificate authentication
-- [ ] Additional features
-  - Container shell access from web UI
-  - Container snapshot/backup functionality
-  - Enhanced audit logging with filters
+> idk
 
 ## License
 
