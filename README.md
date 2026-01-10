@@ -224,7 +224,8 @@ Shows all detected flag-sharing attempts with:
 
 ## Roadmap
 
-> idk
+[ ] Support multiple port mapping per image
+[ ] Support docker compose file for challenge creation
 
 ## License
 
