@@ -10,6 +10,17 @@ Traditionally, container challenges are accessed via `HOST:PORT` (e.g., `ctf.exa
 3.  **Cloudflare Tunnel** forwards traffic to the `traefik` container.
 4.  **Traefik** reads the Host header (`c-a1b2c3d4.example.com`), looks up the active Docker container with the matching UUID label, and routes the request to that container's internal port.
 
+It is crucial to understand that the **CTFd Plugin does NOT route traffic**. It only "tags" containers. The routing infrastructure (Traefik + Cloudflare) does the rest.
+
+### Components & Roles
+
+| Component | Role | Description |
+| :--- | :--- | :--- |
+| **CTFd Plugin** | **Tagging** | Generates a subdomain (e.g., `c-abc12345`) and attaches Docker labels to the challenge container. Tell Docker: *"This container owns c-abc12345"*. |
+| **Traefik** | **Routing** | The "Traffic Cop". It listens to Docker events. When it sees a container with the label `traefik.http.routers...`, it dynamically creates a route for it. |
+| **Cloudflared** | **Ingress** | The "Tunnel". It safely exposes Traefik (port 80) to the public internet via Cloudflare Edge. |
+
+
 ## 2. Components
 
 *   **Cloudflare Tunnel (`cloudflared`)**: Exposes the local Traefik service to the internet without opening ports on your router/firewall. Handles SSL termination.
@@ -18,7 +29,29 @@ Traditionally, container challenges are accessed via `HOST:PORT` (e.g., `ctf.exa
 
 ## 3. Configuration Steps
 
-### Step 1: Cloudflare Setup (Critical)
+### Step 1: Docker Compose Setup
+
+The setup depends on where your challenges run:
+
+#### Scenario A: Local (All-in-One)
+If CTFd and challenges run on the **same server**:
+1.  Use the [docker-compose.recommended.yml](./docker-compose.recommended.yml).
+2.  Ensure `traefik` and `ctfd` share the `ctfd-network`.
+3.  **Settings**: Traefik and Cloudflared must be running in this compose file.
+
+#### Scenario B: Remote (SSH)
+If CTFd runs on Server A, but challenges run on **Server B**:
+1.  **Server A (CTFd)**: Does NOT need Traefik/Cloudflared for challenges (only for itself if needed).
+2.  **Server B (Challenges)**: MUST run `traefik` and `cloudflared`.
+    *   Create a `docker-compose.yml` on Server B with ONLY `traefik` and `cloudflared`.
+    *   **Network**: Must enable `ctfd-network` so Traefik can see containers spawned by the plugin.
+    *   **Settings**: Plugin communicates via SSH, but Traefik routes locally on Server B.
+
+*   **Traefik Version** (Both cases): Use `v2.11` (stable).
+*   **Docker API** (Both cases): Set `DOCKER_API_VERSION=1.45` environment variable for Traefik to work with modern Docker Engines (v25+).
+*   **Network**: All services (`ctfd`, `traefik`, challenge containers) must share a Docker network (e.g., `ctfd-network`).
+
+### Step 2: Cloudflare Setup (Critical)
 
 1.  **DNS Record**:
     *   Go to Cloudflare Dashboard -> DNS.
@@ -36,13 +69,6 @@ Traditionally, container challenges are accessed via `HOST:PORT` (e.g., `ctf.exa
     *   *Note: This tells Cloudflare to send ANY subdomain request for your domain to the Traefik container.*
 
     ![Cloudflare Tunnel Configuration](./image-readme/zerotrust.png)
-
-### Step 2: Docker Compose
-
-Ensure `traefik` and `cloudflared` services are running. Example docker compose file [here](./docker-compose.recommended.yml) 
-*   **Traefik Version**: Use `v2.11` (stable).
-*   **Docker API**: Set `DOCKER_API_VERSION=1.45` environment variable for Traefik to work with modern Docker Engines (v25+).
-*   **Network**: All services (`ctfd`, `traefik`, challenge containers) must share a Docker network (e.g., `ctfd-network`).
 
 ### Step 3: Plugin Settings (CTFd Admin)
 
