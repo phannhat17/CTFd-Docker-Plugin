@@ -164,9 +164,9 @@ class ContainerService:
             subdomain = None
             full_hostname = None
             if use_subdomain:
-                # Generate random 8-char subdomain with prefix format for Cloudflare Free SSL
+                # Generate random 16-char subdomain with prefix format for Cloudflare Free SSL
                 # Format: c-{random}.domain.com (single level, compatible with free SSL)
-                subdomain = f"c-{uuid_module.uuid4().hex[:8]}"
+                subdomain = f"c-{uuid_module.uuid4().hex[:16]}"
                 full_hostname = f"{subdomain}.{subdomain_base_domain}"
                 logger.info(f"Generated subdomain: {full_hostname}")
             
