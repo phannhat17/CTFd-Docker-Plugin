@@ -198,6 +198,7 @@ class ContainerService:
                     f'traefik.http.routers.{router_name}.rule': f'Host(`{full_hostname}`)',
                     f'traefik.http.routers.{router_name}.entrypoints': 'web',
                     f'traefik.http.services.{router_name}.loadbalancer.server.port': str(challenge.internal_port),
+                    'traefik.docker.network': subdomain_network,
                 })
             
             result = self.docker.create_container(

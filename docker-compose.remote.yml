@@ -1,0 +1,35 @@
+# Docker Compose for REMOTE Challenge Node (SSH)
+# Use this file on the server where challenges will run, IF separate from CTFd.
+
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: always
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=PutYourTunnelTokenHere
+    networks:
+      - default
+    depends_on:
+      - traefik
+
+  traefik:
+    image: traefik:v2.11
+    restart: always
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=ctfd-network" # Must match network name below
+      - "--entrypoints.web.address=:80"
+      - "--api.insecure=false"
+      - "--log.level=INFO"
+    environment:
+      - DOCKER_API_VERSION=1.45  # Force API compatibility
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - default
+
+networks:
+  default:
+    name: ctfd-network # Plugin settings must match this network name

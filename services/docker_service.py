@@ -116,13 +116,10 @@ class DockerService:
             # Port mapping - only if not using Traefik
             ports = None if use_traefik else {f'{internal_port}/tcp': host_port}
             
-            # Network mode
-            network_mode = None
-            if use_traefik and network:
-                # Will connect to network after creation
-                network_mode = None
-            else:
-                network_mode = 'bridge'
+            # Network configuration
+            network_arg = network if network else 'bridge'
+            # If network is provided, network_mode should be None (or handled by network arg)
+            # docker-py run() takes 'network' to connect to a specific network
             
             # Create container
             container = self.client.containers.run(
@@ -138,22 +135,14 @@ class DockerService:
                 cpu_period=cpu_period,
                 pids_limit=pids_limit,
                 labels=container_labels,
-                network_mode=network_mode,
+                network=network_arg,
                 # Security options
                 cap_drop=['ALL'],  # Drop all capabilities
                 cap_add=['CHOWN', 'SETUID', 'SETGID'],  # Add back minimal caps
                 security_opt=['no-new-privileges'],
             )
             
-            # Connect to custom network if specified (for Traefik)
-            if network:
-                try:
-                    docker_network = self.client.networks.get(network)
-                    docker_network.connect(container)
-                    logger.info(f"Connected container {container.id[:12]} to network {network}")
-                except Exception as e:
-                    logger.warning(f"Failed to connect to network {network}: {e}")
-            
+            # No need to manually connect if network arg is used
             logger.info(f"Created container {container.id[:12]} from image {image}")
             
             return {

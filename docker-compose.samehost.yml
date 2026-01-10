@@ -19,7 +19,7 @@ services:
     command:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
-      - "--providers.docker.network=ctfd-network"
+      - "--providers.docker.network=ctfd-network" # Must match network name below
       - "--entrypoints.web.address=:80"
       - "--api.insecure=false"
     volumes:

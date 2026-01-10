@@ -35,7 +35,7 @@ The setup depends on where your challenges run:
 
 #### Scenario A: Local (All-in-One)
 If CTFd and challenges run on the **same server**:
-1.  Use the [docker-compose.recommended.yml](./docker-compose.recommended.yml).
+1.  Example compose file: [docker-compose.samehost.yml](./docker-compose.samehost.yml).
 2.  Ensure `traefik` and `ctfd` share the `ctfd-network`.
 3.  **Settings**: Traefik and Cloudflared must be running in this compose file.
 
@@ -43,6 +43,7 @@ If CTFd and challenges run on the **same server**:
 If CTFd runs on Server A, but challenges run on **Server B**:
 1.  **Server A (CTFd)**: Does NOT need Traefik/Cloudflared for challenges (only for itself if needed).
 2.  **Server B (Challenges)**: MUST run `traefik` and `cloudflared`.
+    *   Example compose file: [docker-compose.remote.yml](./docker-compose.remote.yml).
     *   Create a `docker-compose.yml` on Server B with ONLY `traefik` and `cloudflared`.
     *   **Network**: Must enable `ctfd-network` so Traefik can see containers spawned by the plugin.
     *   **Settings**: Plugin communicates via SSH, but Traefik routes locally on Server B.
