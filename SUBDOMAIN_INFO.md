@@ -4,6 +4,11 @@
 
 Traditionally, container challenges are accessed via `HOST:PORT` (e.g., `ctf.example.com:30001`). Subdomain routing allows access via unique URLs (e.g., `https://c-a1b2c3d4.ctf.example.com`) without exposing ports on the host server.
 
+> [!NOTE]
+> **Why this architecture?**
+> This setup uses **Cloudflare Tunnel** + **Traefik** instead of simple port forwarding or direct Nginx to **HIDE the Real Server IP**. 
+> If exposing the real IP were acceptable, this could be much simpler. However, to protect the infrastructure from DDoS and direct attacks, we route all traffic through Cloudflare's Edge Network.
+
 **Traffic Flow:**
 1.  **User** visits `https://c-a1b2c3d4.example.com`
 2.  **Cloudflare DNS** resolves to Cloudflare Tunnel.
