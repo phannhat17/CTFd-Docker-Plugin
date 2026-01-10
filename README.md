@@ -88,6 +88,12 @@ Challenge Containers: challenges.example.com:30000  (separate subdomain)
 - Even with RCE, attacker cannot access CTFd session cookies
 - Users remain protected from session hijacking
 
+### ⚠️ Container Network Isolation
+
+By default, all challenge containers run on the same Docker network (`ctfd-network`). 
+- **Infrastructure Isolation (Protection for CTFd)**: To prevent strict RCE lateral movement to the CTFd database/core, you should split your networks into `ctfd_infra` (internal) and `ctfd_challenges` (external facing).
+- **Sibling Isolation (Protection between Challenges)**: Challenge containers on the same network can technically communicate with each other (Layer 2 visibility). In most CTF environments, this is an acceptable trade-off for simplicity. If strict sibling isolation is required, you must use Docker Swarm/Kubernetes or advanced network policies.
+
 
 ## Configuration
 
