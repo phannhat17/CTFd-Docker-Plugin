@@ -168,7 +168,6 @@ function view_container_info(challenge_id) {
                     link.href = url;
                     link.textContent = url;
                     link.target = '_blank';
-                    link.className = 'btn btn-sm btn-outline-primary';
                     alert.append(link);
                     if (data.connection.info) {
                         alert.append(document.createElement('br'));
