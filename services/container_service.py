@@ -79,7 +79,7 @@ class ContainerService:
         expires_at = datetime.utcnow() + timedelta(minutes=challenge.get_timeout_minutes())
         
         # Generate flag
-        flag_plaintext = self.flag_service.generate_flag(challenge)
+        flag_plaintext = self.flag_service.generate_flag(challenge, account_id=account_id)
         flag_encrypted = self.flag_service.encrypt_flag(flag_plaintext)
         flag_hash = self.flag_service.hash_flag(flag_plaintext)
         

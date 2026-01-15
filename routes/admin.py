@@ -428,6 +428,10 @@ def update_config():
             os.makedirs(ssh_dir, exist_ok=True)
             
             ssh_hostname = data.get('ssh_hostname', '')
+            # Sanitize hostname to prevent path traversal
+            import re
+            safe_hostname = re.sub(r'[^a-zA-Z0-9.-]', '_', ssh_hostname)
+            
             ssh_port = data.get('ssh_port', '22')
             ssh_user = data.get('ssh_user', 'root')
             ssh_key_content = data.get('ssh_key_content', '')
@@ -437,7 +441,7 @@ def update_config():
                 return jsonify({'error': 'SSH hostname is required'}), 400
             
             # Create unique host alias
-            host_alias = f"ctfd-docker-{ssh_hostname.replace('.', '-')}"
+            host_alias = f"ctfd-docker-{safe_hostname}"
             
             # Write SSH private key
             key_path = os.path.join(ssh_dir, f'{host_alias}_key')

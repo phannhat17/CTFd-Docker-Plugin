@@ -33,26 +33,42 @@ class FlagService:
             logger.info("Generated new flag encryption key")
         return key
     
-    def generate_flag(self, challenge, mode='random') -> str:
+    def generate_flag(self, challenge, account_id=None) -> str:
         """
         Generate flag for challenge
         
         Args:
             challenge: ContainerChallenge object
-            mode: 'random' or 'static'
+            account_id: Team or User ID (optional, but recommended for uniqueness)
         
         Returns:
             Plain text flag
         """
-        if mode == 'static' or challenge.flag_mode == 'static':
+        import secrets
+        import hmac
+        import hashlib
+        
+        if challenge.flag_mode == 'static':
             # Static flag: just prefix + suffix
-            flag = f"{challenge.flag_prefix}{challenge.flag_suffix}"
+            return f"{challenge.flag_prefix}{challenge.flag_suffix}"
+            
+        # Random flag
+        length = challenge.random_flag_length or 16
+        alphabet = string.ascii_letters + string.digits
+        random_part = ''.join(secrets.choice(alphabet) for _ in range(length))
+        
+        # If account_id is provided, append a unique fingerprint based on account + challenge
+        # This ensures TWO users never get the same flag even if they random the same string
+        if account_id:
+            # Use encryption key as salt for HMAC
+            salt = self.encryption_key.encode()
+            msg = f"{account_id}:{challenge.id}".encode()
+            fingerprint = hmac.new(salt, msg, hashlib.sha256).hexdigest()[:8]
+            
+            # Combine: prefix + random + fingerprint + suffix
+            # We insert the fingerprint before the suffix
+            flag = f"{challenge.flag_prefix}{random_part}_{fingerprint}{challenge.flag_suffix}"
         else:
-            # Random flag
-            length = challenge.random_flag_length or 16
-            random_part = ''.join(
-                random.choices(string.ascii_letters + string.digits, k=length)
-            )
             flag = f"{challenge.flag_prefix}{random_part}{challenge.flag_suffix}"
         
         return flag
