@@ -96,13 +96,25 @@ Challenge Containers: challenges.example.com:30000  (separate subdomain)
 - Even with RCE, attacker cannot access CTFd session cookies
 - Users remain protected from session hijacking
 
-### ⚠️ Container Network Isolation
+### 🛡️ Container Network Isolation (Hybrid Strategy)
 
-By default, all challenge containers run on the same Docker network (`ctfd-network`). 
-- **Infrastructure Isolation (Protection for CTFd)**: To prevent strict RCE lateral movement to the CTFd database/core, you should split your networks into `ctfd_infra` (internal) and `ctfd_challenges` (external facing).
-- **Sibling Isolation (Protection between Challenges)**: Challenge containers on the same network can technically communicate with each other (Layer 2 visibility). In most CTF environments, this is an acceptable trade-off for simplicity. If strict sibling isolation is required, you must use Docker Swarm/Kubernetes or advanced network policies.
+This plugin implements a **Hybrid Network Isolation** strategy to balance security and functionality:
 
+1.  **Host:Port Challenges (Web/TCP)**:
+    *   **Network**: `ctfd-isolated`
+    *   **Isolation**: **Strict** (`com.docker.network.bridge.enable_icc=false`)
+    *   **Effect**: Containers are isolated at Layer 2. They cannot communicate with each other (no ping, no connect). They can still access the internet via the gateway.
 
+2.  **Subdomain Routing (Only affect Web Challenges)**:
+    *   **Network**: `ctfd-challenges` (or configured value)
+    *   **Isolation**: **Standard** (`enable_icc=true`)
+    *   **Effect**: Web challenge containers share a network to allow the Traefik reverse proxy to route traffic. Sibling isolation is *not* enforced at the Docker network level (Traefik requirement).
+
+3.  **Infrastructure Protection**:
+    *   The CTFd main container is NOT attached to `ctfd-isolated`.
+    *   It generally should not be attached to `ctfd-challenges` either (except for specific specialized setups, but `internal` network is preferred for DB access).
+    *   Challenge containers cannot access the CTFd database or Redis directly.
+    
 ## Configuration
 
 Access admin panel: **Admin → Plugin → Containers → Settings**

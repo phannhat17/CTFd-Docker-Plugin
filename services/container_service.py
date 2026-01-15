@@ -183,8 +183,26 @@ class ContainerService:
                         ports_map = {str(challenge.internal_port): host_port}
 
                     
+
+                    
                     # 2. Get connection host
                     connection_host = ContainerConfig.get('connection_host', 'localhost')
+
+                    # 3. Determine Network
+                    # HYBRID STRATEGY:
+                    # - Subdomain: Use shared 'ctfd-challenges' (ICC=True) so Traefik can route
+                    # - HostType: Use shared 'ctfd-isolated' (ICC=False) for strict isolation
+                    
+                    target_network = subdomain_network if use_subdomain else 'ctfd-isolated'
+                    
+                    if not use_subdomain:
+                        # Ensure isolated network exists with ICC=False
+                        self.docker.create_network(
+                            name='ctfd-isolated',
+                            internal=False, # Must be false to allow internet access
+                            driver='bridge',
+                            options={'com.docker.network.bridge.enable_icc': 'false'}
+                        )
                     
                     # 3. Generate subdomain if enabled
                     subdomain = None
@@ -267,7 +285,7 @@ class ContainerService:
                         pids_limit=challenge.pids_limit,
                         name=container_name,
                         labels=labels,
-                        network=subdomain_network if use_subdomain else None,
+                        network=target_network,
                         use_traefik=use_subdomain
                     )
                     

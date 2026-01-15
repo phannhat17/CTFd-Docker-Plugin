@@ -303,3 +303,66 @@ class DockerService:
                         pass
         except Exception as e:
             logger.error(f"Error during cleanup: {e}")
+
+    def create_network(self, name: str, internal: bool = False, driver: str = 'bridge', options: Dict[str, str] = None) -> bool:
+        """
+        Create a Docker network
+        
+        Args:
+            name: Network name
+            internal: If True, restrict external access
+            driver: Network driver (default: bridge)
+            options: Driver options (e.g. {'com.docker.network.bridge.enable_icc': 'false'})
+        
+        Returns:
+            True if created or already exists, False on error
+        """
+        if not self.is_connected():
+            return False
+            
+        try:
+            # Check if exists
+            try:
+                self.client.networks.get(name)
+                return True
+            except docker.errors.NotFound:
+                pass
+                
+            self.client.networks.create(
+                name=name,
+                driver=driver,
+                internal=internal,
+                options=options,
+                check_duplicate=True,
+                labels={'ctfd.managed': 'true'}
+            )
+            logger.info(f"Created network {name}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to create network {name}: {e}")
+            return False
+
+    def remove_network(self, name: str) -> bool:
+        """
+        Remove a Docker network
+        
+        Args:
+            name: Network name
+        
+        Returns:
+            True if removed or not found, False on error
+        """
+        if not self.is_connected():
+            return False
+            
+        try:
+            network = self.client.networks.get(name)
+            network.remove()
+            logger.info(f"Removed network {name}")
+            return True
+        except docker.errors.NotFound:
+            return True
+        except Exception as e:
+            # Often fails if network is in use, which is expected during race conditions
+            logger.warning(f"Failed to remove network {name} (might be in use): {e}")
+            return False
