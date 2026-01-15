@@ -109,7 +109,8 @@ def request_container():
                     'host': existing.connection_host,
                     'port': existing.connection_port,
                     'type': existing.connection_info.get('type') if existing.connection_info else 'ssh',
-                    'info': existing.connection_info.get('info') if existing.connection_info else ''
+                    'info': existing.connection_info.get('info') if existing.connection_info else '',
+                    'urls': existing.connection_info.get('urls') if existing.connection_info else None
                 },
                 'expires_at': int(existing.expires_at.timestamp() * 1000),
                 'renewal_count': existing.renewal_count,
@@ -146,7 +147,8 @@ def request_container():
                 'port': instance.connection_port,
                 'ports': instance.connection_ports,
                 'type': instance.connection_info.get('type') if instance.connection_info else 'ssh',
-                'info': instance.connection_info.get('info') if instance.connection_info else ''
+                'info': instance.connection_info.get('info') if instance.connection_info else '',
+                'urls': instance.connection_info.get('urls') if instance.connection_info else None
             },
             'expires_at': int(instance.expires_at.timestamp() * 1000),
             'renewal_count': instance.renewal_count,
@@ -197,7 +199,8 @@ def get_container_info(challenge_id):
                 'port': instance.connection_port,
                 'ports': instance.connection_ports,
                 'type': instance.connection_info.get('type') if instance.connection_info else 'ssh',
-                'info': instance.connection_info.get('info') if instance.connection_info else ''
+                'info': instance.connection_info.get('info') if instance.connection_info else '',
+                'urls': instance.connection_info.get('urls') if instance.connection_info else None
             },
             'expires_at': int(instance.expires_at.timestamp() * 1000),
             'renewal_count': instance.renewal_count

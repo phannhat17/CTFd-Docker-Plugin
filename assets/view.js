@@ -405,8 +405,20 @@ function container_stop(challenge_id) {
 })();
 
 function renderConnectionInfo(connection, parent) {
+    // Prioritize URL List (Multi-port Subdomain)
+    if (connection.type == "url_list" && connection.urls) {
+        connection.urls.forEach(function (item) {
+            let link = document.createElement('a');
+            link.href = item.url;
+            link.textContent = item.url;
+            link.target = '_blank';
+            parent.append(link, document.createElement('br'));
+        });
+        return; // Stop here if handled
+    }
+
     if (connection.ports && Object.keys(connection.ports).length > 0) {
-        // Multi-port logic
+        // Multi-port logic (Host:Port fallback)
         if (connection.type == "tcp" || connection.type == "nc") {
             let ports = Object.values(connection.ports).join(', ');
             let code = document.createElement('code');
@@ -429,8 +441,8 @@ function renderConnectionInfo(connection, parent) {
                 parent.append(code, document.createElement('br'));
             }
         } else {
-             // Default/Custom
-             for (let internal in connection.ports) {
+            // Default/Custom
+            for (let internal in connection.ports) {
                 let external = connection.ports[internal];
                 let code = document.createElement('code');
                 code.textContent = connection.host + ":" + external;
@@ -466,13 +478,19 @@ function renderConnectionInfo(connection, parent) {
             link.textContent = 'https://' + connection.host;
             link.target = '_blank';
             parent.append(link);
+        } else if (connection.type == "url_list") {
+            // Redundant fallback (should be handled above), but kept for safety if .urls is empty
+            // Just show generic host
+            let codeElement = document.createElement('code');
+            codeElement.textContent = connection.host;
+            parent.append(codeElement);
         } else {
             let codeElement = document.createElement('code');
             codeElement.textContent = connection.host + ":" + connection.port;
             parent.append(codeElement);
         }
     }
-    
+
     // Append info text if available
     if (connection.info) {
         if (parent.lastChild.tagName != 'BR') parent.append(document.createElement('br'));

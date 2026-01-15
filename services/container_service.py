@@ -218,14 +218,42 @@ class ContainerService:
                     
                     # Add Traefik labels if subdomain routing is enabled
                     if use_subdomain:
-                        router_name = f"ctfd-{instance.uuid[:8]}"
                         labels.update({
                             'traefik.enable': 'true',
-                            f'traefik.http.routers.{router_name}.rule': f'Host(`{full_hostname}`)',
-                            f'traefik.http.routers.{router_name}.entrypoints': 'web',
-                            f'traefik.http.services.{router_name}.loadbalancer.server.port': str(challenge.internal_port),
                             'traefik.docker.network': subdomain_network,
                         })
+                        
+                        # Handle multiple ports
+                        target_ports = [challenge.internal_port]
+                        if challenge.internal_ports:
+                            # If explicit multiple ports defined
+                            try:
+                                pt_list = [int(p.strip()) for p in challenge.internal_ports.split(',') if p.strip()]
+                                if pt_list:
+                                    target_ports = pt_list
+                            except:
+                                pass
+                                
+                        for p in target_ports:
+                            # Router name must be unique per port
+                            # Format: ctfd-{uuid}-{port}
+                            port_suffix = f"-{p}" if str(p) != str(challenge.internal_port) else ""
+                            router_name = f"ctfd-{instance.uuid[:8]}{port_suffix}"
+                            
+                            # Subdomain: 
+                            # Main port = random-uuid
+                            # Other ports = random-uuid-port
+                            current_subdomain = subdomain if str(p) == str(challenge.internal_port) else f"{subdomain}-{p}"
+                            current_hostname = f"{current_subdomain}.{subdomain_base_domain}"
+                            
+                            current_service_name = f"{router_name}-service"
+
+                            labels.update({
+                                f'traefik.http.routers.{router_name}.rule': f'Host(`{current_hostname}`)',
+                                f'traefik.http.routers.{router_name}.entrypoints': 'web',
+                                f'traefik.http.routers.{router_name}.service': current_service_name,
+                                f'traefik.http.services.{current_service_name}.loadbalancer.server.port': str(p),
+                            })
                     
                     result = self.docker.create_container(
                         image=challenge.image,
@@ -249,11 +277,45 @@ class ContainerService:
                     instance.connection_ports = ports_map
                     
                     if use_subdomain:
-                        # For subdomain routing: store URL
-                        instance.connection_host = full_hostname
+                        # For subdomain routing: store URLs
+                        urls = []
+                        
+                        # Primary port (first one) gets the base subdomain
+                        # Others get base-port
+                        primary_port = str(challenge.internal_port)
+                        
+                        # We need to reconstruct the map of internal_port -> subdomain
+                        # Actually we already have internal ports from challenge.internal_ports logic above,
+                        # but let's be robust.
+                        
+                        # If we have multiple ports, we generated multiple rules above.
+                        # We need to store them in connection_info so frontend can display them.
+                        
+                        # Re-calculate ports list for consistent ordering
+                        target_ports = [challenge.internal_port]
+                        if challenge.internal_ports:
+                             pt_list = [int(p.strip()) for p in challenge.internal_ports.split(',') if p.strip()]
+                             if pt_list:
+                                target_ports = pt_list
+
+                        for p in target_ports:
+                            p_str = str(p)
+                            # Logic must match label generation
+                            if p_str == str(challenge.internal_port):
+                                s_name = subdomain
+                            else:
+                                s_name = f"{subdomain}-{p}"
+                            
+                            f_hostname = f"{s_name}.{subdomain_base_domain}"
+                            urls.append({
+                                'port': p,
+                                'url': f"https://{f_hostname}"
+                            })
+
+                        instance.connection_host = full_hostname # Keep primary for backward compat
                         instance.connection_info = {
-                            'type': 'url',
-                            'url': f"https://{full_hostname}",
+                            'type': 'url_list',
+                            'urls': urls,
                             'subdomain': subdomain,
                             'info': challenge.container_connection_info
                         }
