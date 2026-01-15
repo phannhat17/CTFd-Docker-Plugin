@@ -225,11 +225,7 @@ Shows all detected flag-sharing attempts with:
 ## Roadmap
 
 - [x] Support multiple port mapping per image  
-![](./image-readme/multiple-port.png)
-![](./image-readme/multiple-port-user.png)
 - [x] Discord webhook notifications
-![](./image-readme/discord-admin.png)
-![](./image-readme/discord-demo.png)
 - [ ] Support docker compose file for challenge creation
 
 ## License
