@@ -109,6 +109,16 @@
 			</div>
 
 			<div class="form-group">
+				<label for="container_max_concurrent_count">Max Concurrent Containers (per User/Team)</label>
+				<input class="form-control" type="number" name="container_max_concurrent_count"
+					id="container_max_concurrent_count" placeholder="3"
+					value="{{ settings.container_max_concurrent_count }}">
+				<small class="form-text text-muted">
+					Maximum number of containers a user or team can run simultaneously
+				</small>
+			</div>
+
+			<div class="form-group">
 				<label for="container_maxmemory">Max Memory per Container</label>
 				<input class="form-control" type="text" name="max_memory" id="container_maxmemory" placeholder="512m"
 					value="{{ settings.container_maxmemory }}">

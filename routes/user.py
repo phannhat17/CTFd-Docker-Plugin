@@ -116,6 +116,21 @@ def request_container():
                 'max_renewals': challenge.get_max_renewals()
             })
         
+        # Check concurrent container limit (using configured value, default 3)
+        from ..models.config import ContainerConfig
+        max_containers = int(ContainerConfig.get('container_max_concurrent_count', 3))
+        
+        running_count = ContainerInstance.query.filter_by(
+            account_id=account_id
+        ).filter(
+            ContainerInstance.status.in_(['running', 'provisioning'])
+        ).count()
+        
+        if running_count >= max_containers:
+            return jsonify({
+                'error': f'You have reached the maximum number of concurrent containers ({max_containers})'
+            }), 403
+        
         # Create new instance
         instance = container_service.create_instance(
             challenge_id=challenge_id,
