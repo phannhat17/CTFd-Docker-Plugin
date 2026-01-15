@@ -19,7 +19,7 @@ services:
     command:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
-      - "--providers.docker.network=ctfd-network" # Must match network name below
+      - "--providers.docker.network=ctfd-challenges" # Must match network name below
       - "--entrypoints.web.address=:80"
       - "--api.insecure=false"
       - "--log.level=INFO"
@@ -32,4 +32,4 @@ services:
 
 networks:
   default:
-    name: ctfd-network # Plugin settings must match this network name
+    name: ctfd-challenges # Plugin settings must match this network name

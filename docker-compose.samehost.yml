@@ -19,7 +19,7 @@ services:
     command:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
-      - "--providers.docker.network=ctfd-network" # Must match network name below
+      - "--providers.docker.network=ctfd-challenges" # Must match network name below
       - "--entrypoints.web.address=:80"
       - "--api.insecure=false"
     volumes:
@@ -28,6 +28,7 @@ services:
       - DOCKER_API_VERSION=1.45  # Force older API
     networks:
       - default
+      - ctfd-challenges
 
   ctfd:
     build: .
@@ -96,7 +97,9 @@ services:
 
 networks:
     default:
-        name: ctfd-network
     internal:
         internal: true
+    ctfd-challenges:
+        name: ctfd-challenges
+        internal: false
 
