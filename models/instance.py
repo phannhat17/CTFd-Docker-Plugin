@@ -42,6 +42,7 @@ class ContainerInstance(db.Model):
     # Connection info
     connection_host = db.Column(db.String(255))  # Host to connect (IP/hostname)
     connection_port = db.Column(db.Integer)  # Exposed port
+    connection_ports = db.Column(db.JSON)  # Mapping of internal to external ports: {"80": 30001, "22": 30002}
     connection_info = db.Column(db.JSON)  # Extra connection details
     
     # Flag management (encrypted)

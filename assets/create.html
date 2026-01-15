@@ -48,7 +48,8 @@
 				<span>How the dynamic value will be calculated based on the Decay value</span>
 				<ul>
 					<li>Linear: Calculated as <code>Initial - (Decay * SolveCount)</code></li>
-					<li>Logarithmic: Calculated as <code>(((Minimum - Initial) / (Decay^2)) * (SolveCount^2)) + Initial</code></li>
+					<li>Logarithmic: Calculated as
+						<code>(((Minimum - Initial) / (Decay^2)) * (SolveCount^2)) + Initial</code></li>
 				</ul>
 			</small>
 		</label>
@@ -64,7 +65,8 @@
 				<span>The decay value is used differently depending on the above Decay Function</span>
 				<ul>
 					<li>Linear: The amount of points deducted per solve. Equal deduction per solve.</li>
-					<li>Logarithmic: The amount of solves before the challenge reaches its minimum value. Earlier solves will lose less
+					<li>Logarithmic: The amount of solves before the challenge reaches its minimum value. Earlier solves
+						will lose less
 						points. Later solves will lose more points</li>
 				</ul>
 			</small>
@@ -99,26 +101,26 @@
 	<label>
 		Connect type<br>
 		<small class="form-text text-muted">
-			Connect via web or tcp
+			Connect via web or tcp (Netcat)
 		</small>
 	</label>
-	<select type="text" class="form-control" name="connection_type" placeholder="Connect via" id="connect-type"
-		title="Connect via web or tcp" required>
-		<option value="" selected disabled>Choose a value...</option>
+	<select class="form-control" name="connection_type">
 		<option value="http">Web (HTTP)</option>
-		<option value="tcp">TCP</option>
-		<option value="ssh">SSH</option>
+		<option value="tcp">TCP (Netcat)</option>
 	</select>
 </div>
 
 <div class="form-group">
 	<label>
-		Internal Port<br>
+		Internal Port(s)<br>
 		<small class="form-text text-muted">
-			Internal container port that should be exposed (external port will be automatically assigned)
+			Internal container ports to expose (comma separated, e.g. "80,22")
 		</small>
 	</label>
-	<input type="number" class="form-control" name="internal_port" placeholder="Enter port" required>
+	<input type="text" class="form-control" name="internal_ports" placeholder="80,22"
+		oninput="document.getElementById('internal_port_hidden').value = this.value.split(',')[0].trim() || '22'"
+		required>
+	<input type="hidden" name="internal_port" id="internal_port_hidden" value="22">
 </div>
 
 <div class="form-group">
@@ -138,7 +140,8 @@
 			<strong>Easy flag configuration! Just enter your flag pattern:</strong>
 			<ul>
 				<li><strong>Static flag:</strong> <code>CTF{this_is_the_flag}</code> → Same flag for everyone</li>
-				<li><strong>Random flag:</strong> <code>CTF{this_is_the_flag_&lt;ran_8&gt;}</code> → Unique flag per team/user
+				<li><strong>Random flag:</strong> <code>CTF{this_is_the_flag_&lt;ran_8&gt;}</code> → Unique flag per
+					team/user
 					<ul>
 						<li><code>&lt;ran_8&gt;</code> will be replaced with 8 random characters</li>
 						<li><code>&lt;ran_16&gt;</code> for 16 characters, etc.</li>

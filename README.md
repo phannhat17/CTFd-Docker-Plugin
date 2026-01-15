@@ -224,7 +224,9 @@ Shows all detected flag-sharing attempts with:
 
 ## Roadmap
 
-- [ ] Support multiple port mapping per image  
+- [x] Support multiple port mapping per image  
+![](./image-readme/multiple-port.png)
+![](./image-readme/multiple-port-user.png)
 - [ ] Support docker compose file for challenge creation
 
 ## License

@@ -25,6 +25,7 @@ def upgrade():
         sa.Column('container_id', sa.String(length=64), nullable=True),
         sa.Column('connection_host', sa.String(length=255), nullable=True),
         sa.Column('connection_port', sa.Integer(), nullable=True),
+        sa.Column('connection_ports', sa.JSON(), nullable=True),
         sa.Column('connection_info', sa.JSON(), nullable=True),
         sa.Column('flag_encrypted', sa.Text(), nullable=False),
         sa.Column('flag_hash', sa.String(length=64), nullable=False),

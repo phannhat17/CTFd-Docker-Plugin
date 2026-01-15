@@ -6,7 +6,7 @@ CTFd._internal.challenge.postRender = function () { };
 
 CTFd._internal.challenge.submit = function (preview) {
     var challenge_id = parseInt(CTFd.lib.$("#challenge-id").val());
-    var submission = CTFd.lib.$("#challenge-input").val();
+    var submission = CTFd.lib.$("#challenge-input").val().trim();
 
     let alert = resetAlert();
 
@@ -147,58 +147,7 @@ function view_container_info(challenge_id) {
                 alert.append(expires, document.createElement('br'));
 
                 // Display connection info based on type
-                if (data.connection.type == "tcp" || data.connection.type == "nc") {
-                    let codeElement = document.createElement('code');
-                    codeElement.textContent = 'nc ' + data.connection.host + " " + data.connection.port;
-                    alert.append(codeElement);
-                } else if (data.connection.type == "ssh") {
-                    let codeElement = document.createElement('code');
-                    codeElement.textContent = 'ssh -p ' + data.connection.port + ' user@' + data.connection.host;
-                    alert.append(codeElement);
-                    if (data.connection.info) {
-                        alert.append(document.createElement('br'));
-                        let info = document.createElement('small');
-                        info.textContent = data.connection.info;
-                        alert.append(info);
-                    }
-                } else if (data.connection.type == "url") {
-                    // Subdomain routing - show direct URL
-                    let link = document.createElement('a');
-                    let url = data.connection.url || ('https://' + data.connection.host);
-                    link.href = url;
-                    link.textContent = url;
-                    link.target = '_blank';
-                    alert.append(link);
-                    if (data.connection.info) {
-                        alert.append(document.createElement('br'));
-                        let info = document.createElement('small');
-                        info.textContent = data.connection.info;
-                        alert.append(info);
-                    }
-                } else if (data.connection.type == "http" || data.connection.type == "web") {
-                    let link = document.createElement('a');
-                    link.href = 'http://' + data.connection.host + ":" + data.connection.port;
-                    link.textContent = 'http://' + data.connection.host + ":" + data.connection.port;
-                    link.target = '_blank';
-                    alert.append(link);
-                } else if (data.connection.type == "https") {
-                    let link = document.createElement('a');
-                    link.href = 'https://' + data.connection.host;
-                    link.textContent = 'https://' + data.connection.host;
-                    link.target = '_blank';
-                    alert.append(link);
-                } else {
-                    // Custom connection type
-                    let codeElement = document.createElement('code');
-                    codeElement.textContent = data.connection.host + ":" + data.connection.port;
-                    alert.append(codeElement);
-                    if (data.connection.info) {
-                        alert.append(document.createElement('br'));
-                        let info = document.createElement('small');
-                        info.textContent = data.connection.info;
-                        alert.append(info);
-                    }
-                }
+                renderConnectionInfo(data.connection, alert);
                 hideChallengeCreate();
                 toggleChallengeUpdate();
             } else {
@@ -243,58 +192,7 @@ function container_request(challenge_id) {
                 alert.append(expires, document.createElement('br'));
 
                 // Display connection info based on type
-                if (data.connection.type == "tcp" || data.connection.type == "nc") {
-                    let codeElement = document.createElement('code');
-                    codeElement.textContent = 'nc ' + data.connection.host + " " + data.connection.port;
-                    alert.append(codeElement);
-                } else if (data.connection.type == "ssh") {
-                    let codeElement = document.createElement('code');
-                    codeElement.textContent = 'ssh -p ' + data.connection.port + ' user@' + data.connection.host;
-                    alert.append(codeElement);
-                    if (data.connection.info) {
-                        alert.append(document.createElement('br'));
-                        let info = document.createElement('small');
-                        info.textContent = data.connection.info;
-                        alert.append(info);
-                    }
-                } else if (data.connection.type == "url") {
-                    // Subdomain routing - show direct URL
-                    let link = document.createElement('a');
-                    let url = data.connection.url || ('https://' + data.connection.host);
-                    link.href = url;
-                    link.textContent = url;
-                    link.target = '_blank';
-                    alert.append(link);
-                    if (data.connection.info) {
-                        alert.append(document.createElement('br'));
-                        let info = document.createElement('small');
-                        info.textContent = data.connection.info;
-                        alert.append(info);
-                    }
-                } else if (data.connection.type == "http" || data.connection.type == "web") {
-                    let link = document.createElement('a');
-                    link.href = 'http://' + data.connection.host + ":" + data.connection.port;
-                    link.textContent = 'http://' + data.connection.host + ":" + data.connection.port;
-                    link.target = '_blank';
-                    alert.append(link);
-                } else if (data.connection.type == "https") {
-                    let link = document.createElement('a');
-                    link.href = 'https://' + data.connection.host;
-                    link.textContent = 'https://' + data.connection.host;
-                    link.target = '_blank';
-                    alert.append(link);
-                } else {
-                    // Custom connection type
-                    let codeElement = document.createElement('code');
-                    codeElement.textContent = data.connection.host + ":" + data.connection.port;
-                    alert.append(codeElement);
-                    if (data.connection.info) {
-                        alert.append(document.createElement('br'));
-                        let info = document.createElement('small');
-                        info.textContent = data.connection.info;
-                        alert.append(info);
-                    }
-                }
+                renderConnectionInfo(data.connection, alert);
                 hideChallengeCreate();
                 toggleChallengeUpdate();
             }
@@ -505,3 +403,81 @@ function container_stop(challenge_id) {
 
     // console.log("[Container] MutationObserver started");
 })();
+
+function renderConnectionInfo(connection, parent) {
+    if (connection.ports && Object.keys(connection.ports).length > 0) {
+        // Multi-port logic
+        if (connection.type == "tcp" || connection.type == "nc") {
+            let ports = Object.values(connection.ports).join(', ');
+            let code = document.createElement('code');
+            code.textContent = 'nc ' + connection.host + " " + ports;
+            parent.append(code);
+        } else if (connection.type == "http" || connection.type == "web") {
+            for (let internal in connection.ports) {
+                let external = connection.ports[internal];
+                let link = document.createElement('a');
+                link.href = 'http://' + connection.host + ":" + external;
+                link.textContent = 'http://' + connection.host + ":" + external;
+                link.target = '_blank';
+                parent.append(link, document.createElement('br'));
+            }
+        } else if (connection.type == "ssh") {
+            for (let internal in connection.ports) {
+                let external = connection.ports[internal];
+                let code = document.createElement('code');
+                code.textContent = 'ssh -p ' + external + ' user@' + connection.host;
+                parent.append(code, document.createElement('br'));
+            }
+        } else {
+             // Default/Custom
+             for (let internal in connection.ports) {
+                let external = connection.ports[internal];
+                let code = document.createElement('code');
+                code.textContent = connection.host + ":" + external;
+                parent.append(code, document.createElement('br'));
+            }
+        }
+    } else {
+        // Legacy single port
+        if (connection.type == "tcp" || connection.type == "nc") {
+            let codeElement = document.createElement('code');
+            codeElement.textContent = 'nc ' + connection.host + " " + connection.port;
+            parent.append(codeElement);
+        } else if (connection.type == "ssh") {
+            let codeElement = document.createElement('code');
+            codeElement.textContent = 'ssh -p ' + connection.port + ' user@' + connection.host;
+            parent.append(codeElement);
+        } else if (connection.type == "url") {
+            let link = document.createElement('a');
+            let url = connection.url || ('https://' + connection.host);
+            link.href = url;
+            link.textContent = url;
+            link.target = '_blank';
+            parent.append(link);
+        } else if (connection.type == "http" || connection.type == "web") {
+            let link = document.createElement('a');
+            link.href = 'http://' + connection.host + ":" + connection.port;
+            link.textContent = 'http://' + connection.host + ":" + connection.port;
+            link.target = '_blank';
+            parent.append(link);
+        } else if (connection.type == "https") {
+            let link = document.createElement('a');
+            link.href = 'https://' + connection.host;
+            link.textContent = 'https://' + connection.host;
+            link.target = '_blank';
+            parent.append(link);
+        } else {
+            let codeElement = document.createElement('code');
+            codeElement.textContent = connection.host + ":" + connection.port;
+            parent.append(codeElement);
+        }
+    }
+    
+    // Append info text if available
+    if (connection.info) {
+        if (parent.lastChild.tagName != 'BR') parent.append(document.createElement('br'));
+        let info = document.createElement('small');
+        info.textContent = connection.info;
+        parent.append(info);
+    }
+}

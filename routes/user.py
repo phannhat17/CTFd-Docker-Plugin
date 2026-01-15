@@ -129,6 +129,7 @@ def request_container():
             'connection': {
                 'host': instance.connection_host,
                 'port': instance.connection_port,
+                'ports': instance.connection_ports,
                 'type': instance.connection_info.get('type') if instance.connection_info else 'ssh',
                 'info': instance.connection_info.get('info') if instance.connection_info else ''
             },
@@ -179,6 +180,7 @@ def get_container_info(challenge_id):
             'connection': {
                 'host': instance.connection_host,
                 'port': instance.connection_port,
+                'ports': instance.connection_ports,
                 'type': instance.connection_info.get('type') if instance.connection_info else 'ssh',
                 'info': instance.connection_info.get('info') if instance.connection_info else ''
             },

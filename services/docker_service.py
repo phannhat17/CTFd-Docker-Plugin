@@ -62,8 +62,9 @@ class DockerService:
     def create_container(
         self,
         image: str,
-        internal_port: int,
-        host_port: int,
+        internal_port: int = None,
+        host_port: int = None,
+        ports: Dict[str, int] = None,  # New: {'80': 30001, '22': 30002}
         command: str = None,
         environment: Dict[str, str] = None,
         memory_limit: str = "512m",
@@ -114,7 +115,16 @@ class DockerService:
             })
             
             # Port mapping - only if not using Traefik
-            ports = None if use_traefik else {f'{internal_port}/tcp': host_port}
+            ports_config = None
+            if not use_traefik:
+                if ports:
+                    # New multi-port mode: ports = {'80': 30001, '22': 30002}
+                    ports_config = {}
+                    for internal, external in ports.items():
+                        ports_config[f'{internal}/tcp'] = external
+                else:
+                    # Legacy single port mode
+                    ports_config = {f'{internal_port}/tcp': host_port}
             
             # Network configuration
             network_arg = network if network else 'bridge'
@@ -128,7 +138,7 @@ class DockerService:
                 command=command,
                 detach=True,
                 auto_remove=True,  # Auto remove when container stops/fails
-                ports=ports,
+                ports=ports_config,
                 environment=environment or {},
                 mem_limit=memory_limit,
                 cpu_quota=cpu_quota,
@@ -177,7 +187,7 @@ class DockerService:
         
         try:
             container = self.client.containers.get(container_id)
-            container.stop(timeout=10)
+            container.stop(timeout=3)
             container.remove()
             logger.info(f"Stopped and removed container {container_id[:12]}")
             return True

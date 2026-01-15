@@ -20,6 +20,7 @@ class ContainerChallenge(Challenges):
     # Docker configuration
     image = db.Column(db.String(255), nullable=False)
     internal_port = db.Column(db.Integer, nullable=False, default=22)
+    internal_ports = db.Column(db.Text, default="")  # Comma separated list of ports: "80,22"
     command = db.Column(db.Text, default="")
     
     # Connection info for users

@@ -154,122 +154,168 @@ class ContainerService:
                 challenge.container_connection_type in ('http', 'https', 'web')
             )
             
-            # 1. Allocate port (still needed for fallback or non-web challenges)
-            host_port = self.port_manager.allocate_port()
+            # Retry loop for race conditions (max 5 retries)
+            max_retries = 5
+            import time
             
-            # 2. Get connection host
-            connection_host = ContainerConfig.get('connection_host', 'localhost')
-            
-            # 3. Generate subdomain if enabled
-            subdomain = None
-            full_hostname = None
-            if use_subdomain:
-                # Generate random 16-char subdomain with prefix format for Cloudflare Free SSL
-                # Format: c-{random}.domain.com (single level, compatible with free SSL)
-                subdomain = f"c-{uuid_module.uuid4().hex[:16]}"
-                full_hostname = f"{subdomain}.{subdomain_base_domain}"
-                logger.info(f"Generated subdomain: {full_hostname}")
-            
-            # 4. Create Docker container
-            # Generate container name: challengename_accountid
-            import re
-            # Sanitize challenge name (only alphanumeric and hyphens)
-            safe_name = re.sub(r'[^a-zA-Z0-9-]', '', challenge.name.replace(' ', '-').lower())
-            container_name = f"{safe_name}_{instance.account_id}"
-            
-            # Replace {FLAG} placeholder in command if present
-            command = challenge.command if challenge.command else None
-            if command and '{FLAG}' in command:
-                command = command.replace('{FLAG}', flag)
-            
-            # Base labels
-            labels = {
-                'ctfd.instance_uuid': instance.uuid,
-                'ctfd.challenge_id': str(challenge.id),
-                'ctfd.account_id': str(instance.account_id),
-                'ctfd.expires_at': str(instance.expires_at.timestamp())
-            }
-            
-            # Add Traefik labels if subdomain routing is enabled
-            if use_subdomain:
-                router_name = f"ctfd-{instance.uuid[:8]}"
-                labels.update({
-                    'traefik.enable': 'true',
-                    f'traefik.http.routers.{router_name}.rule': f'Host(`{full_hostname}`)',
-                    f'traefik.http.routers.{router_name}.entrypoints': 'web',
-                    f'traefik.http.services.{router_name}.loadbalancer.server.port': str(challenge.internal_port),
-                    'traefik.docker.network': subdomain_network,
-                })
-            
-            result = self.docker.create_container(
-                image=challenge.image,
-                internal_port=challenge.internal_port,
-                host_port=host_port,
-                command=command,
-                environment={'FLAG': flag},
-                memory_limit=challenge.get_memory_limit(),
-                cpu_limit=challenge.get_cpu_limit(),
-                pids_limit=challenge.pids_limit,
-                name=container_name,
-                labels=labels,
-                network=subdomain_network if use_subdomain else None,
-                use_traefik=use_subdomain
-            )
-            
-            # 5. Update instance
-            instance.container_id = result['container_id']
-            instance.connection_port = host_port
-            
-            if use_subdomain:
-                # For subdomain routing: store URL
-                instance.connection_host = full_hostname
-                instance.connection_info = {
-                    'type': 'url',
-                    'url': f"https://{full_hostname}",
-                    'subdomain': subdomain,
-                    'info': challenge.container_connection_info
-                }
-            else:
-                # For port-based routing: store host:port
-                instance.connection_host = connection_host
-                instance.connection_info = {
-                    'type': challenge.container_connection_type,
-                    'info': challenge.container_connection_info
-                }
-            
-            instance.status = 'running'
-            instance.started_at = datetime.utcnow()
-            
-            db.session.commit()
-            
-            # 6. Schedule expiration in Redis (for accurate killing)
-            try:
-                from .. import redis_expiration_service
-                if redis_expiration_service:
-                    expires_in_seconds = int((instance.expires_at - datetime.utcnow()).total_seconds())
-                    redis_expiration_service.schedule_expiration(
-                        instance.uuid,
-                        expires_in_seconds
+            for attempt in range(max_retries):
+                try:
+                    # 1. Allocate ports
+                    host_port = None
+                    ports_map = None
+                    
+                    if challenge.internal_ports:
+                        try:
+                            int_ports = [int(p.strip()) for p in challenge.internal_ports.split(',') if p.strip()]
+                            if int_ports:
+                                allocated = self.port_manager.allocate_ports(len(int_ports))
+                                ports_map = dict(zip([str(p) for p in int_ports], allocated))
+                                # Use the first one as primary for fallback/compatibility
+                                host_port = allocated[0]
+                        except Exception as e:
+                            logger.error(f"Failed to parse/allocate internal_ports: {e}")
+                            raise
+                    
+                    if not ports_map:
+                        # Fallback to single port
+                        host_port = self.port_manager.allocate_port()
+                        ports_map = {str(challenge.internal_port): host_port}
+
+                    
+                    # 2. Get connection host
+                    connection_host = ContainerConfig.get('connection_host', 'localhost')
+                    
+                    # 3. Generate subdomain if enabled
+                    subdomain = None
+                    full_hostname = None
+                    if use_subdomain:
+                        # Generate random 16-char subdomain with prefix format for Cloudflare Free SSL
+                        # Format: c-{random}.domain.com (single level, compatible with free SSL)
+                        subdomain = f"c-{uuid_module.uuid4().hex[:16]}"
+                        full_hostname = f"{subdomain}.{subdomain_base_domain}"
+                        logger.info(f"Generated subdomain: {full_hostname}")
+                    
+                    # 4. Create Docker container
+                    # Generate container name: challengename_accountid
+                    import re
+                    # Sanitize challenge name (only alphanumeric and hyphens)
+                    safe_name = re.sub(r'[^a-zA-Z0-9-]', '', challenge.name.replace(' ', '-').lower())
+                    container_name = f"{safe_name}_{instance.account_id}"
+                    
+                    # Replace {FLAG} placeholder in command if present
+                    command = challenge.command if challenge.command else None
+                    if command and '{FLAG}' in command:
+                        command = command.replace('{FLAG}', flag)
+                    
+                    # Base labels
+                    labels = {
+                        'ctfd.instance_uuid': instance.uuid,
+                        'ctfd.challenge_id': str(challenge.id),
+                        'ctfd.account_id': str(instance.account_id),
+                        'ctfd.expires_at': str(instance.expires_at.timestamp())
+                    }
+                    
+                    # Add Traefik labels if subdomain routing is enabled
+                    if use_subdomain:
+                        router_name = f"ctfd-{instance.uuid[:8]}"
+                        labels.update({
+                            'traefik.enable': 'true',
+                            f'traefik.http.routers.{router_name}.rule': f'Host(`{full_hostname}`)',
+                            f'traefik.http.routers.{router_name}.entrypoints': 'web',
+                            f'traefik.http.services.{router_name}.loadbalancer.server.port': str(challenge.internal_port),
+                            'traefik.docker.network': subdomain_network,
+                        })
+                    
+                    result = self.docker.create_container(
+                        image=challenge.image,
+                        internal_port=challenge.internal_port,
+                        host_port=host_port,
+                        ports=ports_map,
+                        command=command,
+                        environment={'FLAG': flag},
+                        memory_limit=challenge.get_memory_limit(),
+                        cpu_limit=challenge.get_cpu_limit(),
+                        pids_limit=challenge.pids_limit,
+                        name=container_name,
+                        labels=labels,
+                        network=subdomain_network if use_subdomain else None,
+                        use_traefik=use_subdomain
                     )
-            except Exception as e:
-                logger.warning(f"Failed to schedule Redis expiration: {e}")
-            
-            logger.info(f"Provisioned container {result['container_id'][:12]} for instance {instance.uuid}")
-            if use_subdomain:
-                logger.info(f"Subdomain routing: https://{subdomain}.{subdomain_base_domain}")
-            
-            # Audit log
-            self._create_audit_log(
-                'instance_started',
-                instance_id=instance.id,
-                challenge_id=challenge.id,
-                account_id=instance.account_id,
-                details={
-                    'container_id': result['container_id'],
-                    'port': host_port,
-                    'subdomain': subdomain if use_subdomain else None
-                }
-            )
+                    
+                    # 5. Update instance
+                    instance.container_id = result['container_id']
+                    instance.connection_port = host_port
+                    instance.connection_ports = ports_map
+                    
+                    if use_subdomain:
+                        # For subdomain routing: store URL
+                        instance.connection_host = full_hostname
+                        instance.connection_info = {
+                            'type': 'url',
+                            'url': f"https://{full_hostname}",
+                            'subdomain': subdomain,
+                            'info': challenge.container_connection_info
+                        }
+                    else:
+                        # For port-based routing: store host:port
+                        instance.connection_host = connection_host
+                        instance.connection_info = {
+                            'type': challenge.container_connection_type,
+                            'info': challenge.container_connection_info
+                        }
+                    
+                    instance.status = 'running'
+                    instance.started_at = datetime.utcnow()
+                    
+                    db.session.commit()
+                    
+                    # 6. Schedule expiration in Redis (for accurate killing)
+                    try:
+                        from .. import redis_expiration_service
+                        if redis_expiration_service:
+                            expires_in_seconds = int((instance.expires_at - datetime.utcnow()).total_seconds())
+                            redis_expiration_service.schedule_expiration(
+                                instance.uuid,
+                                expires_in_seconds
+                            )
+                    except Exception as e:
+                        logger.warning(f"Failed to schedule Redis expiration: {e}")
+                    
+                    logger.info(f"Provisioned container {result['container_id'][:12]} for instance {instance.uuid}")
+                    if use_subdomain:
+                        logger.info(f"Subdomain routing: https://{subdomain}.{subdomain_base_domain}")
+                    
+                    # Audit log
+                    self._create_audit_log(
+                        'instance_started',
+                        instance_id=instance.id,
+                        challenge_id=challenge.id,
+                        account_id=instance.account_id,
+                        details={
+                            'container_id': result['container_id'],
+                            'port': host_port,
+                            'ports': ports_map,
+                            'subdomain': subdomain if use_subdomain else None
+                        }
+                    )
+                    
+                    # Success: break loop
+                    break
+                    
+                except Exception as e:
+                    logger.warning(f"Attempt {attempt+1}/{max_retries} failed: {e}")
+                    # If this was the last attempt, re-raise the exception
+                    if attempt == max_retries - 1:
+                        logger.error(f"Error provisioning container after {max_retries} attempts: {e}")
+                        instance.status = 'error'
+                        instance.extra_data = {'error': str(e)}
+                        db.session.commit()
+                        raise
+                    
+                    # Wait before retrying (exponential backoff not really needed here, just jitter)
+                    import random
+                    time.sleep(0.1 + random.random() * 0.2)
+
             
         except Exception as e:
             logger.error(f"Error provisioning container: {e}")
@@ -366,6 +412,10 @@ class ContainerService:
             if instance.connection_port:
                 self.port_manager.release_port(instance.connection_port)
                 logger.info(f"Released port {instance.connection_port}")
+            
+            if instance.connection_ports:
+                for int_p, ext_p in instance.connection_ports.items():
+                    self.port_manager.release_port(ext_p)
             
             # Update instance based on reason
             if reason == 'solved':
