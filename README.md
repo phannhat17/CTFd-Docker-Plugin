@@ -42,7 +42,15 @@ A comprehensive CTFd plugin that enables dynamic Docker container challenges wit
 
 ## Installation
 
-1. **Configure Docker socket access:** (Optional)
+1. **Download the latest release:**
+
+Download the latest release from [here](https://github.com/phannhat17/CTFd-Docker-Plugin/releases/latest) and extract it to the `plugins` directory of your CTFd installation.
+
+Remember to rename the extracted folder to `containers`.
+
+![](./image-readme/install.png)
+
+2. **Configure Docker socket access:** (Only for local docker)
 ```yaml
 # In docker-compose.yml
   ctfd:
@@ -50,7 +58,7 @@ A comprehensive CTFd plugin that enables dynamic Docker container challenges wit
       - /var/run/docker.sock:/var/run/docker.sock
 ```
 
-2. **Enable Redis keyspace notifications:**
+3. **Enable Redis keyspace notifications:**
 ```yaml
 # In docker-compose.yml
    cache:
