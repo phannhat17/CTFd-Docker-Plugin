@@ -79,14 +79,16 @@ def dashboard():
     from CTFd.models import Users, Teams
     
     # Fetch instances grouped by status
-    running_instances = ContainerInstance.query.filter_by(status='running').order_by(ContainerInstance.created_at.desc()).all()
+    # Fetch instances grouped by status
+    page = abs(request.args.get("page", 1, type=int))
+    running_instances = ContainerInstance.query.filter_by(status='running').order_by(ContainerInstance.created_at.desc()).paginate(page=page, per_page=50)
     provisioning_instances = ContainerInstance.query.filter_by(status='provisioning').order_by(ContainerInstance.created_at.desc()).all()
     solved_instances = ContainerInstance.query.filter_by(status='solved').order_by(ContainerInstance.created_at.desc()).limit(20).all()
     stopped_instances = ContainerInstance.query.filter_by(status='stopped').order_by(ContainerInstance.created_at.desc()).limit(20).all()
     error_instances = ContainerInstance.query.filter_by(status='error').order_by(ContainerInstance.created_at.desc()).limit(10).all()
     
     # Get stats
-    running_count = len(running_instances)
+    running_count = running_instances.total
     total_count = ContainerInstance.query.count()
     
     # Get Docker status

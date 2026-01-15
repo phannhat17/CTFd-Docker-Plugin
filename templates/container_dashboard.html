@@ -56,8 +56,8 @@
 		</tr>
 	</thead>
 	<tbody>
-		{% if running_instances and running_instances|length > 0 %}
-		{% for instance in running_instances %}
+		{% if running_instances and running_instances.items|length > 0 %}
+		{% for instance in running_instances.items %}
 		<tr data-instance-id="{{ instance.id }}">
 			<td class="border-right" data-checkbox>
 				<div class="form-check text-center">&nbsp; <input type="checkbox"
@@ -141,6 +141,35 @@
 		{% endif %}
 	</tbody>
 </table>
+
+{% if running_instances.pages > 1 %}
+<div class="text-center">
+	Page
+	<br>
+	{% if running_instances.has_prev %}
+	<a href="{{ url_for('containers_admin.dashboard', page=running_instances.prev_num) }}">
+		&lt;&lt;&lt;
+	</a>
+	{% endif %}
+	<select class="page-select" onchange="if (this.value) window.location.href=this.value">
+		{% for page_num in running_instances.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=1) %}
+		{% if page_num %}
+		<option value="{{ url_for('containers_admin.dashboard', page=page_num) }}" {{ 'selected' if
+			page_num==running_instances.page }}>
+			{{ page_num }}
+		</option>
+		{% else %}
+		<option disabled>...</option>
+		{% endif %}
+		{% endfor %}
+	</select>
+	{% if running_instances.has_next %}
+	<a href="{{ url_for('containers_admin.dashboard', page=running_instances.next_num) }}">
+		&gt;&gt;&gt;
+	</a>
+	{% endif %}
+</div>
+{% endif %}
 {% include "config/container_status.html" %}
 {% endblock %}
 
