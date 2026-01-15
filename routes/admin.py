@@ -78,18 +78,53 @@ def dashboard():
     from CTFd.utils import get_config
     from CTFd.models import Users, Teams
     
-    # Fetch instances grouped by status
-    # Fetch instances grouped by status
+    # Get filters from request
+    q = request.args.get("q", "").strip()
+    challenge_id = request.args.get("challenge_id", type=int)
+    
+    # Default status filter to 'running' if not explicitly provided
+    status_filter = request.args.get("status")
+    if status_filter is None:
+        status_filter = 'running'
+    else:
+        status_filter = status_filter.strip()
+        
     page = abs(request.args.get("page", 1, type=int))
-    running_instances = ContainerInstance.query.filter_by(status='running').order_by(ContainerInstance.created_at.desc()).paginate(page=page, per_page=50)
-    provisioning_instances = ContainerInstance.query.filter_by(status='provisioning').order_by(ContainerInstance.created_at.desc()).all()
-    solved_instances = ContainerInstance.query.filter_by(status='solved').order_by(ContainerInstance.created_at.desc()).limit(20).all()
-    stopped_instances = ContainerInstance.query.filter_by(status='stopped').order_by(ContainerInstance.created_at.desc()).limit(20).all()
-    error_instances = ContainerInstance.query.filter_by(status='error').order_by(ContainerInstance.created_at.desc()).limit(10).all()
+    
+    # Base query
+    query = ContainerInstance.query
+    
+    # Apply filters
+    if challenge_id:
+        query = query.filter_by(challenge_id=challenge_id)
+    
+    if status_filter:
+        query = query.filter_by(status=status_filter)
+        
+    if q:
+        # Search in container_id or search through users/teams
+        # Search by team name or user name is tricky with SQLAlchemy without joins
+        # For simplicity in this plugin, we'll join on Users and Teams if q is present
+        is_teams_mode = get_config('user_mode') == 'teams'
+        if is_teams_mode:
+            query = query.join(Teams, Teams.id == ContainerInstance.account_id).filter(
+                (ContainerInstance.container_id.ilike(f"%{q}%")) |
+                (Teams.name.ilike(f"%{q}%"))
+            )
+        else:
+            query = query.join(Users, Users.id == ContainerInstance.account_id).filter(
+                (ContainerInstance.container_id.ilike(f"%{q}%")) |
+                (Users.name.ilike(f"%{q}%"))
+            )
+    
+    instances = query.order_by(ContainerInstance.created_at.desc()).paginate(page=page, per_page=20)
+    
+    # Get all challenges for the filter dropdown
+    all_challenges = ContainerChallenge.query.all()
     
     # Get stats
-    running_count = running_instances.total
     total_count = ContainerInstance.query.count()
+    running_count = ContainerInstance.query.filter_by(status='running').count()
     
     # Get Docker status
     connected, docker_info = _get_docker_status()
@@ -98,17 +133,19 @@ def dashboard():
     is_teams_mode = get_config('user_mode') == 'teams'
     
     return render_template('container_dashboard.html',
-                         running_instances=running_instances,
-                         provisioning_instances=provisioning_instances,
-                         solved_instances=solved_instances,
-                         stopped_instances=stopped_instances,
-                         error_instances=error_instances,
+                         instances=instances,
+                         all_challenges=all_challenges,
                          running_count=running_count,
                          total_count=total_count,
                          connected=connected,
                          docker_info=docker_info,
                          is_teams_mode=is_teams_mode,
-                         active_page='dashboard')
+                         active_page='dashboard',
+                         filters={
+                             'q': q,
+                             'challenge_id': challenge_id,
+                             'status': status_filter
+                         })
 
 
 @admin_bp.route('/settings')
@@ -330,7 +367,7 @@ def api_bulk_delete():
             instance = ContainerInstance.query.get(instance_id)
             if instance:
                 # Stop container if running
-                if instance.status == 'running' and instance.container_id:
+                if instance.status in ('running', 'provisioning') and instance.container_id:
                     container_service.stop_instance(instance, user_id=None, reason='admin_bulk_delete')
                 
                 db.session.delete(instance)
@@ -340,6 +377,44 @@ def api_bulk_delete():
         
         return jsonify({'success': True, 'deleted': deleted_count})
             
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@admin_bp.route('/api/bulk/emergency-stop', methods=['POST'], endpoint='api_emergency_stop')
+@admins_only
+def api_emergency_stop():
+    """STOP ALL running containers immediately"""
+    try:
+        running_instances = ContainerInstance.query.filter(
+            ContainerInstance.status.in_(['running', 'provisioning'])
+        ).all()
+        
+        stopped_count = 0
+        for instance in running_instances:
+            if container_service.stop_instance(instance, user_id=None, reason='emergency_stop'):
+                stopped_count += 1
+        
+        return jsonify({'success': True, 'stopped': stopped_count})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@admin_bp.route('/api/bulk/cleanup-solved', methods=['POST'], endpoint='api_cleanup_solved')
+@admins_only
+def api_cleanup_solved():
+    """Delete all instances with status 'solved'"""
+    try:
+        solved_instances = ContainerInstance.query.filter_by(status='solved').all()
+        
+        deleted_count = 0
+        for instance in solved_instances:
+            db.session.delete(instance)
+            deleted_count += 1
+        
+        db.session.commit()
+        return jsonify({'success': True, 'deleted': deleted_count})
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
