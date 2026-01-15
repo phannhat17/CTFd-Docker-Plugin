@@ -67,7 +67,7 @@ class FlagService:
             
             # Combine: prefix + random + fingerprint + suffix
             # We insert the fingerprint before the suffix
-            flag = f"{challenge.flag_prefix}{random_part}_{fingerprint}{challenge.flag_suffix}"
+            flag = f"{challenge.flag_prefix}{random_part}{fingerprint}{challenge.flag_suffix}"
         else:
             flag = f"{challenge.flag_prefix}{random_part}{challenge.flag_suffix}"
         
