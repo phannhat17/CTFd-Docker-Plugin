@@ -136,6 +136,7 @@ def settings():
         'subdomain_base_domain': ContainerConfig.get('subdomain_base_domain', ''),
         'subdomain_network': ContainerConfig.get('subdomain_network', 'ctfd-network'),
         'container_max_concurrent_count': ContainerConfig.get('container_max_concurrent_count', '3'),
+        'container_discord_webhook_url': ContainerConfig.get('container_discord_webhook_url', ''),
     }
     
     # Get Docker status
@@ -642,6 +643,36 @@ def docker_health_check():
             'connected': False,
             'error': str(e)
         }), 500
+
+
+@admin_bp.route('/api/notifications/test', methods=['POST'], endpoint='api_notification_test')
+@admins_only
+def test_notification():
+    """Test webhooks"""
+    try:
+        from .. import notification_service
+        if not notification_service:
+             return jsonify({'error': 'Notification service not available'}), 500
+        
+        data = request.get_json()
+        type = data.get('type', 'connection')
+        url = data.get('url')
+        
+        success = False
+        if type == 'connection':
+            success = notification_service.send_test(url)
+        elif type == 'demo_cheat':
+            success = notification_service.send_demo_cheat(url)
+        elif type == 'demo_error':
+            success = notification_service.send_demo_error(url)
+            
+        if success:
+            return jsonify({'success': True})
+        else:
+             return jsonify({'error': 'Failed to send notification. Check server logs.'}), 400
+             
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 # ============================================================================

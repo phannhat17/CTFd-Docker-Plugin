@@ -11,6 +11,8 @@ from .anticheat_service import AntiCheatService
 from .port_manager import PortManager
 from .redis_service import RedisExpirationService
 
+from .notification_service import NotificationService
+
 __all__ = [
     'DockerService',
     'FlagService',
@@ -18,4 +20,5 @@ __all__ = [
     'AntiCheatService',
     'PortManager',
     'RedisExpirationService',
+    'NotificationService',
 ]

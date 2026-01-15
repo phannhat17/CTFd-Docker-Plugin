@@ -119,6 +119,28 @@
 			</div>
 
 			<div class="form-group">
+				<label for="container_discord_webhook_url">Discord Webhook URL</label>
+				<input class="form-control" type="text" name="container_discord_webhook_url"
+					id="container_discord_webhook_url" placeholder="https://discord.com/api/webhooks/..."
+					value="{{ settings.container_discord_webhook_url }}">
+				<small class="form-text text-muted">
+					Optional: URL to send notifications for Cheat Alerts and System Errors. Leave empty to disable.
+				</small>
+
+				<div class="mt-2">
+					<button type="button" class="btn btn-outline-success btn-sm" onclick="testWebhook('connection')">
+						<i class="fas fa-plug"></i> Test Connection
+					</button>
+					<button type="button" class="btn btn-outline-danger btn-sm" onclick="testWebhook('demo_cheat')">
+						<i class="fas fa-exclamation-triangle"></i> Demo Cheat
+					</button>
+					<button type="button" class="btn btn-outline-warning btn-sm" onclick="testWebhook('demo_error')">
+						<i class="fas fa-bug"></i> Demo Error
+					</button>
+				</div>
+			</div>
+
+			<div class="form-group">
 				<label for="container_maxmemory">Max Memory per Container</label>
 				<input class="form-control" type="text" name="max_memory" id="container_maxmemory" placeholder="512m"
 					value="{{ settings.container_maxmemory }}">
@@ -306,5 +328,44 @@
 			})
 			.catch(e => alert('Network error: ' + e));
 	});
+
+	// Webhook testing
+	function testWebhook(type) {
+		const url = document.getElementById('container_discord_webhook_url').value;
+		if (!url) {
+			alert('Please enter a Webhook URL first');
+			return;
+		}
+
+		const btn = event.target.closest('button');
+		const originalText = btn.innerHTML;
+		btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+		btn.disabled = true;
+
+		fetch('{{ url_for("containers_admin.api_notification_test") }}', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'CSRF-Token': '{{ Session.nonce }}'
+			},
+			body: JSON.stringify({
+				type: type,
+				url: url
+			})
+		})
+			.then(r => r.json())
+			.then(data => {
+				if (data.success) {
+					alert('Test sent successfully! Check your Discord.');
+				} else {
+					alert('Failed: ' + (data.error || 'Unknown error'));
+				}
+			})
+			.catch(e => alert('Network error: ' + e))
+			.finally(() => {
+				btn.innerHTML = originalText;
+				btn.disabled = false;
+			});
+	}
 </script>
 {% endblock %}

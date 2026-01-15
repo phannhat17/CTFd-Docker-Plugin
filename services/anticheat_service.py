@@ -17,8 +17,9 @@ class AntiCheatService:
     Service to validate flags and detect cheating
     """
     
-    def __init__(self, flag_service: FlagService):
+    def __init__(self, flag_service: FlagService, notification_service=None):
         self.flag_service = flag_service
+        self.notification_service = notification_service
     
     def validate_flag(
         self,
@@ -192,6 +193,15 @@ class AntiCheatService:
                 f"CHEAT DETECTED: Account {account_id} submitted flag belonging to {flag_record.account_id} "
                 f"for challenge {challenge_id} - BOTH ACCOUNTS BANNED"
             )
+            
+            # Trigger Discord Notification
+            if self.notification_service:
+                self.notification_service.notify_cheat(
+                    user=cheater_user if not is_team_mode else None, # Teams handled differently in notify but simplistic here
+                    challenge=challenge,
+                    flag=submitted_flag,
+                    owner=owner_user if not is_team_mode else None # Teams handled differently
+                )
             
             # Don't reveal to user that flag reuse was detected
             return (False, "Incorrect", True)

@@ -29,7 +29,9 @@ from .services import (
     FlagService,
     ContainerService,
     AntiCheatService,
-    PortManager
+    AntiCheatService,
+    PortManager,
+    NotificationService
 )
 
 # Import routes
@@ -392,7 +394,9 @@ flag_service = None
 container_service = None
 anticheat_service = None
 port_manager = None
+port_manager = None
 redis_expiration_service = None
+notification_service = None
 
 
 def load(app: Flask):
@@ -402,7 +406,7 @@ def load(app: Flask):
     Args:
         app: Flask app instance
     """
-    global docker_service, flag_service, container_service, anticheat_service, port_manager, redis_expiration_service
+    global docker_service, flag_service, container_service, anticheat_service, port_manager, redis_expiration_service, notification_service
     
     logger.info("Loading Container Challenge Plugin")
     
@@ -444,16 +448,20 @@ def load(app: Flask):
     port_end = int(ContainerConfig.get('port_range_end', 31000))
     port_manager = PortManager(port_start, port_end)
     logger.info(f"Port manager initialized: {port_start}-{port_end}")
+
+    # Notification service
+    notification_service = NotificationService()
+    logger.info("Notification service initialized")
     
     # Container service
     if docker_service:
-        container_service = ContainerService(docker_service, flag_service, port_manager)
+        container_service = ContainerService(docker_service, flag_service, port_manager, notification_service)
         logger.info("Container service initialized")
     else:
         logger.warning("Container service not initialized (Docker unavailable)")
     
     # Anticheat service
-    anticheat_service = AntiCheatService(flag_service)
+    anticheat_service = AntiCheatService(flag_service, notification_service)
     logger.info("Anticheat service initialized")
     
     # Redis expiration service (for accurate container killing)

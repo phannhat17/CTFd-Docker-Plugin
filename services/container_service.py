@@ -21,10 +21,11 @@ class ContainerService:
     Service to manage container lifecycle
     """
     
-    def __init__(self, docker_service: DockerService, flag_service: FlagService, port_manager: PortManager):
+    def __init__(self, docker_service: DockerService, flag_service: FlagService, port_manager: PortManager, notification_service=None):
         self.docker = docker_service
         self.flag_service = flag_service
         self.port_manager = port_manager
+        self.notification_service = notification_service
         self._cleanup_running = False  # Prevent overlapping cleanup jobs
     
     def create_instance(self, challenge_id: int, account_id: int, user_id: int) -> ContainerInstance:
@@ -319,6 +320,11 @@ class ContainerService:
             
         except Exception as e:
             logger.error(f"Error provisioning container: {e}")
+            
+            # Send notification
+            if self.notification_service:
+                 self.notification_service.notify_error("Container Provisioning", str(e))
+
             instance.status = 'error'
             instance.extra_data = {'error': str(e)}
             db.session.commit()
