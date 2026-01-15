@@ -5,9 +5,59 @@
 {% endblock %}
 
 {% block panel %}
-<div class="alert alert-info mb-3">
-	<i class="fas fa-cog"></i> <strong>Global Settings:</strong> These settings apply to ALL container challenges.
-	Individual challenges no longer have separate timeout/resource limits - they all use these global values.
+<div class="alert alert-info border-0 shadow-sm mb-3">
+	<div class="d-flex justify-content-between align-items-center">
+		<span><i class="fas fa-cog mr-2"></i> <strong>Global Settings:</strong> Applies to all container
+			challenges.</span>
+		<button class="btn btn-sm btn-link text-info p-0" type="button" data-toggle="collapse"
+			data-target="#settingsHelp">
+			<i class="far fa-question-circle mr-1"></i> Legend & Help
+		</button>
+	</div>
+	<div class="collapse mt-2" id="settingsHelp">
+		<div class="card card-body bg-light border-0 small">
+			<div class="row">
+				<div class="col-md-6 border-right">
+					<h6 class="font-weight-bold text-uppercase text-muted mb-2">Docker Configuration</h6>
+					<ul class="list-unstyled mb-0">
+						<li class="mb-2"><strong>Docker Type:</strong>
+							<ul>
+								<li><code>Local</code>: Uses local socket <code>/var/run/docker.sock</code>.</li>
+								<li><code>SSH</code>: Remote Docker over SSH (requires Key/Agent).</li>
+							</ul>
+						</li>
+						<li class="mb-2"><strong>Routing Modes:</strong>
+							<ul>
+								<li><code>Host:Port</code>: Uses <strong>Connection Hostname</strong> + allocated port
+									(e.g. <code>challenges.ctf.com:30001</code>). Used for TCP/SSH.</li>
+								<li><code>Subdomain</code>: Uses <strong>Base Domain</strong> (e.g.
+									<code>uuid.challenges.ctf.com</code>). Used for Web/HTTP.</li>
+							</ul>
+						</li>
+						<li class="mb-2"><strong>Connection Hostname:</strong>
+							<br>The public domain/IP for Host:Port challenges.
+							<br><span class="text-danger"><i class="fas fa-exclamation-triangle"></i> Security:</span>
+							Do
+							not use the same domain as CTFd to prevent cookie theft.
+						</li>
+					</ul>
+				</div>
+				<div class="col-md-6 pl-md-4">
+					<h6 class="font-weight-bold text-uppercase text-muted mb-2">Limits & Resources</h6>
+					<dl class="mb-0">
+						<dt>Expiration</dt>
+						<dd>Minutes before container is killed. 0 = Infinite.</dd>
+						<dt>Max Renewals</dt>
+						<dd>How many times user can extend time (+5 mins each).</dd>
+						<dt>Concurrent Limit</dt>
+						<dd>Max containers per User/Team at once.</dd>
+						<dt>CPU / Memory</dt>
+						<dd>Hard limits applied to every container (e.g. 0.5 CPU, 512MB RAM).</dd>
+					</dl>
+				</div>
+			</div>
+		</div>
+	</div>
 </div>
 
 <form id="settings-form">

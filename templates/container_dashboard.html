@@ -7,7 +7,45 @@
 {% block panel %}
 
 <div class="alert alert-info border-0 shadow-sm mb-4">
-	<i class="fas fa-info-circle mr-2"></i> Auto refreshes every 15 seconds.
+	<div class="d-flex justify-content-between align-items-center">
+		<span><i class="fas fa-info-circle mr-2"></i> Auto refreshes every 15 seconds.</span>
+		<button class="btn btn-sm btn-link text-info p-0" type="button" data-toggle="collapse"
+			data-target="#dashboardHelp">
+			<i class="far fa-question-circle mr-1"></i> Help
+		</button>
+	</div>
+	<div class="collapse mt-2" id="dashboardHelp">
+		<div class="card card-body bg-light border-0 small">
+			<div class="row">
+				<div class="col-md-6 border-right">
+					<h6 class="font-weight-bold text-uppercase text-muted mb-2">Statuses</h6>
+					<ul class="list-unstyled mb-0">
+						<li class="mb-1"><span class="badge badge-success">Running</span> Container is active and
+							accessible.
+						</li>
+						<li class="mb-1"><span class="badge badge-warning">Provisioning</span> Container is starting up.
+						</li>
+						<li class="mb-1"><span class="badge badge-secondary">Stopped</span> Container expired or stopped
+							manually.</li>
+						<li class="mb-1"><span class="badge badge-danger">Error</span> Startup failed or runtime error.
+						</li>
+						<li><span class="badge badge-info">Solved</span> User submitted flag (auto-stopped).</li>
+					</ul>
+				</div>
+				<div class="col-md-6 pl-md-4">
+					<h6 class="font-weight-bold text-uppercase text-muted mb-2">Actions</h6>
+					<dl class="mb-0">
+						<dt class="text-danger"><i class="fas fa-trash-alt mr-1"></i> Delete</dt>
+						<dd>Terminates the container process and <strong>permanently deletes</strong> the database
+							entry. Cannot be undone.</dd>
+						<dt class="text-danger"><i class="fas fa-power-off mr-1"></i> Emergency Stop</dt>
+						<dd>Immediately stops <strong>ALL</strong> running containers. Database entries are
+							<strong>preserved</strong> (status changes to 'Stopped').</dd>
+					</dl>
+				</div>
+			</div>
+		</div>
+	</div>
 </div>
 
 <style>
