@@ -151,11 +151,7 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
-
-# The docs workflow is part of the repository, so .github is tracked.
-# Uncomment the next line to ignore it if you keep CI elsewhere.
-# .github/
-
+.github/
 # PyCharm
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
 #  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
