@@ -1,18 +1,12 @@
-# Cloudflare Pages configuration for the documentation site.
-#
-# With this file present, a deploy needs no path argument:
-#
-#     npx wrangler pages deploy
-#
-# The same values are what you enter in the Cloudflare dashboard when you
-# connect the repository instead of deploying from CI:
-#
-#     Build command           npm run docs:build
-#     Build output directory  docs/.vitepress/dist
-#     Root directory          /            (the repository root)
-#
-# Cloudflare reads .nvmrc for the Node version, which is set to 20.
+# Must match the Worker name in the Cloudflare dashboard, otherwise Cloudflare
+# offers to open a pull request that rewrites this file.
+name = "ctfd-docker-plugin"
 
-name = "ctfd-containers-docs"
 compatibility_date = "2025-01-01"
-pages_build_output_dir = "docs/.vitepress/dist"
+
+[assets]
+directory = "./docs/.vitepress/dist"
+
+html_handling = "auto-trailing-slash"
+
+not_found_handling = "404-page"
