@@ -35,6 +35,10 @@ Full instructions are in [this link](https://ctfd-docker-plugin.phannhat.com/).
 
 Browsers send cookies to every port on a hostname. If challenge containers are published on the same hostname as CTFd, a challenge with a remote code execution bug can steal player session cookies. Use a separate hostname or IP for challenges. See [docs/security.md](docs/security.md).
 
+## Credits
+
+This plugin started as a fork of [andyjsmith/CTFd-Docker-Plugin](https://github.com/andyjsmith/CTFd-Docker-Plugin), which is MIT licensed. Large parts have since been rewritten, but the original structure and the challenge type come from that project, so its copyright notice is kept in [LICENSE](LICENSE) alongside this fork's own.
+
 ## License
 
-See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
