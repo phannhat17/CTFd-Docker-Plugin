@@ -62,10 +62,13 @@ class ContainerChallenge(Challenges):
     flag_suffix = db.Column(db.String(50), default="}")
     random_flag_length = db.Column(db.Integer, default=16)
 
-    # Dynamic scoring (like CTFd dynamic challenges)
+    # Dynamic scoring (like CTFd dynamic challenges).
+    # decay 0 means standard scoring: solve() only recalculates a challenge whose
+    # decay is greater than zero, so this default keeps a challenge created
+    # without dynamic fields from being treated as dynamic.
     container_initial = db.Column(db.Integer, default=500, name="initial")
     container_minimum = db.Column(db.Integer, default=100, name="minimum")
-    container_decay = db.Column(db.Integer, default=20, name="decay")
+    container_decay = db.Column(db.Integer, default=0, name="decay")
     decay_function = db.Column(db.String(32), default="logarithmic")  # linear or logarithmic
 
     def __init__(self, *args, **kwargs):

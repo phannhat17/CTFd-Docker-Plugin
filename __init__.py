@@ -159,9 +159,45 @@ class ContainerChallengeType(BaseChallenge):
         if not challenge.flag_mode:
             challenge.flag_mode = 'static' if not challenge.random_flag_length else 'random'
 
+        # Scoring mode has to be made explicit. The columns for dynamic scoring
+        # carry defaults (initial 500, decay 20), and those defaults are applied
+        # by the database on INSERT, so a challenge the admin created with
+        # Standard scoring ends up with decay=20. calculate_value() then treats
+        # it as dynamic and the value jumps to initial on the first solve.
+        cls._apply_scoring_mode(challenge, data)
+
         # Dynamic challenges keep value == initial
-        if challenge.container_decay and challenge.container_initial:
+        if challenge.container_decay and challenge.container_decay > 0 and challenge.container_initial:
             challenge.value = challenge.container_initial
+        return challenge
+
+    @classmethod
+    def _apply_scoring_mode(cls, challenge, data):
+        """
+        Normalise the scoring fields.
+
+        A standard challenge is stored with decay 0 so solve() never recalculates
+        its value. A dynamic challenge must carry an initial value, a decay and a
+        minimum.
+        """
+        scoring_type = str(data.get('scoring_type') or '').strip().lower()
+        supplied_decay = data.get('decay', data.get('container_decay'))
+
+        if scoring_type == 'dynamic':
+            if not challenge.container_initial or not challenge.container_decay:
+                raise ValueError("Dynamic scoring needs an initial value and a decay")
+            if challenge.container_minimum is None:
+                challenge.container_minimum = 0
+            return challenge
+
+        if scoring_type == 'standard':
+            challenge.container_decay = 0
+            return challenge
+
+        # No explicit mode: treat a challenge with no decay as standard so the
+        # column default cannot silently make it dynamic.
+        if not supplied_decay and not challenge.container_decay:
+            challenge.container_decay = 0
         return challenge
 
     @staticmethod

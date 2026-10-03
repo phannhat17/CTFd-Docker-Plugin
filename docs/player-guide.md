@@ -56,7 +56,29 @@ Terminating releases the container and the resources it was using. You can fetch
 
 Submit the flag in the usual flag box and click **Submit**.
 
+![Correct flag submitted](images/user-submit-correct.png)
+
 When the flag is correct, the plugin stops your container immediately. There is no reason to keep it running after the challenge is solved, and the resources go back to the pool. You will not be able to start another instance for that challenge afterwards, because you have already solved it.
+
+The challenge is then marked as solved in the listing:
+
+![Solved challenge in the listing](images/user-solved.png)
+
+## Submitting another team's flag
+
+Flags are issued per account, so a flag that belongs to another team is not the correct answer for you. Here team-blue has its own running instance:
+
+![The other team's own instance](images/user-other-team-instance.png)
+
+It then submits the flag that belongs to team-red. The response is treated exactly like a wrong answer:
+
+![Another team's flag rejected](images/user-submit-other-team.png)
+
+Note what the panel shows here. This is team-blue, with its own running instance on port 30224, submitting the flag that belongs to team-red. The response is a plain **Incorrect**, with no hint that anything unusual happened.
+
+That is deliberate. The organizers are told about it, and the event is written to the admin cheat log with the source IP and the account it belonged to. The player is not told, so nobody learns from the response whether a flag was another team's, or which team it came from. See [anti-cheat.md](anti-cheat.md) for what happens on the organizer side.
+
+If you are stuck, ask the organizers for a hint rather than sharing flags. Sharing usually ends with both teams banned, because a shared flag is indistinguishable from a stolen one.
 
 ## When the time runs out
 
