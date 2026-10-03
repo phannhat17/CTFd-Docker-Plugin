@@ -1,3 +1,8 @@
+---
+title: Operations
+description: "Background jobs, expiry, retention, recovery and monitoring."
+---
+
 # Operations
 
 Day to day behaviour of the plugin: what runs in the background, what the database holds, and how to recover from common situations.

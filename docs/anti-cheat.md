@@ -1,3 +1,8 @@
+---
+title: Anti-cheat
+description: "Flag reuse detection, the two outcomes, and optional auto-ban."
+---
+
 # Anti-cheat
 
 The plugin watches for one specific kind of cheating: a player submitting a flag that belongs to a different account. Because every account gets its own flag, this is a reliable signal that flags are being shared.

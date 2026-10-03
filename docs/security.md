@@ -1,3 +1,8 @@
+---
+title: Security
+description: "Cookie exposure, container isolation, and what each control really blocks."
+---
+
 # Security
 
 This document describes what the plugin protects against, what it does not, and which settings matter most.

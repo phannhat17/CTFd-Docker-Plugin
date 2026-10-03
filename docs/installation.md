@@ -1,3 +1,8 @@
+---
+title: Installation
+description: "Requirements, Docker setup, dependencies and the first run."
+---
+
 # Installation
 
 ## Requirements

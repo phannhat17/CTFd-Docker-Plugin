@@ -1,3 +1,8 @@
+---
+title: Configuration
+description: "Every admin setting, its default, and what it changes."
+---
+
 # Configuration
 
 All settings live in **Admin, Containers, Console**, on the **Settings** tab. They are stored in the `container_config` table and take effect immediately. No restart is needed, except when you change the Docker connection and the new endpoint is unreachable.
@@ -73,7 +78,7 @@ Requirements:
 - A wildcard DNS record for the base domain.
 - Challenge containers attached to that network, which the plugin does.
 
-See [SUBDOMAIN_INFO.md](../SUBDOMAIN_INFO.md) in the repository root for a deployment walkthrough.
+See [Subdomain routing](subdomain-routing.md) for a deployment walkthrough.
 
 ## Anti-cheat and retention
 

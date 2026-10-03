@@ -1,3 +1,8 @@
+---
+title: Changelog
+description: "What changed in each release and what to check when upgrading."
+---
+
 # Changelog
 
 Notable changes to this plugin, grouped by the problem each one solved. This project follows [Semantic Versioning](https://semver.org/).

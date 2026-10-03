@@ -1,3 +1,8 @@
+---
+title: Admin console
+description: "The console tab by tab, the instance lifecycle and the JSON API."
+---
+
 # Admin console
 
 The console lives at **Admin, Containers, Console**, or directly at `/admin/containers/app`.

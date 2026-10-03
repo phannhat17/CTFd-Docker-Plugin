@@ -1,3 +1,8 @@
+---
+title: Subdomain routing
+description: "Serving web challenges through Traefik on a random subdomain."
+---
+
 # Subdomain Routing Guide for CTFd Containers Plugin
 
 ## 1. Architecture Overview
@@ -66,7 +71,7 @@ If CTFd runs on Server A, but challenges run on **Server B**:
         *   **Target**: Your Tunnel URL (e.g., `uuid.cfargotunnel.com`) or your server domain if managing tunnel differently.
         *   **Proxy Status**: On (Orange Cloud).
     
-    ![Cloudflare DNS Record](./image-readme/dns.png)
+    ![Cloudflare DNS Record](images/subdomain-cloudflare-dns.png)
 
 2.  **Tunnel Configuration** (Zero Trust Dashboard):
     *   Add a Public Hostname route:
@@ -74,7 +79,7 @@ If CTFd runs on Server A, but challenges run on **Server B**:
         *   **Service**: `http://traefik:80`
     *   *Note: This tells Cloudflare to send ANY subdomain request for your domain to the Traefik container.*
 
-    ![Cloudflare Tunnel Configuration](./image-readme/zerotrust.png)
+    ![Cloudflare Tunnel Configuration](images/subdomain-cloudflare-tunnel.png)
 
 ### Step 3: Plugin Settings (CTFd Admin)
 
@@ -85,7 +90,7 @@ Go to **Admin Panel -> Containers -> Settings**:
     *   *Do not include `challenge.` prefix if using Cloudflare Free plan (SSL limitations).*
 3.  **Docker Network Name**: `ctfd-network` (Must match the network name in `docker-compose.yml`).
 
-![CTFd Plugin Settings](./image-readme/config-sub.png)
+![CTFd Plugin Settings](images/subdomain-plugin-settings.png)
 
 ## 4. How It Works Internally
 
@@ -100,8 +105,8 @@ When a user starts a web challenge:
 4.  Traefik detects the new container and creates a route.
 5.  Plugin returns the URL `https://c-ac3fdbd9.example.com` to the user.
 
-![CTFd Plugin Settings](./image-readme/sub-1.png)
-![CTFd Plugin Settings](./image-readme/sub-2.png)
+![CTFd Plugin Settings](images/subdomain-example-1.png)
+![CTFd Plugin Settings](images/subdomain-example-2.png)
 
 ## 5. Troubleshooting
 

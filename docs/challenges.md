@@ -1,3 +1,8 @@
+---
+title: Creating a challenge
+description: "Images, internal ports, flags, scoring and resource limits."
+---
+
 # Creating a container challenge
 
 A container challenge looks like any other CTFd challenge to a player, except that it has a **Fetch Instance** button instead of static connection text.

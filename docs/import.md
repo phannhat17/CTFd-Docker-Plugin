@@ -1,3 +1,8 @@
+---
+title: Bulk import
+description: "Importing challenges from CSV or an Excel workbook."
+---
+
 # Import challenges
 
 The import endpoint accepts CSV and Excel workbooks. For a few challenges the admin form is faster. For a whole category, the import is much faster.

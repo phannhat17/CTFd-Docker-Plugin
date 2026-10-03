@@ -1,3 +1,8 @@
+---
+title: Troubleshooting
+description: "Common errors and how to fix them."
+---
+
 # Troubleshooting
 
 ## The plugin does not load

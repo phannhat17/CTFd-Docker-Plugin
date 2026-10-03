@@ -1,3 +1,8 @@
+---
+title: Player guide
+description: "What a player sees: fetching, extending, terminating and submitting flags."
+---
+
 # Player guide
 
 This is what a player sees. No knowledge of Docker is required.
