@@ -48,35 +48,35 @@ This plugin descends from andyjsmith's, which is the oldest of the CTFd plugins 
 
 ## Where this plugin is the better choice
 
-**Setup is the smallest of the group.** The others need something beyond a Docker socket: whale needs a Swarm cluster and an frp relay, owl needs docker-compose, rCTF needs a separate FastAPI service or a Kubernetes operator, kCTF needs a Kubernetes cluster. For a small CTF on one machine, this plugin is a volume mount and a settings page.
+- **Setup is the smallest of the group.** The others need something beyond a Docker socket: whale needs a Swarm cluster and an frp relay, owl needs docker-compose, rCTF needs a separate FastAPI service or a Kubernetes operator, kCTF needs a Kubernetes cluster. For a small CTF on one machine, this plugin is a volume mount and a settings page.
 
-**Flag sharing detection is close to unique.** None of the other CTFd plugins document detecting that a player submitted another team's flag, and neither rCTF nor kCTF advertise it. If you care about flag sharing, this is the only one that gives you a cheat log out of the box.
+- **Flag sharing detection is close to unique.** None of the other CTFd plugins document detecting that a player submitted another team's flag, and neither rCTF nor kCTF advertise it. If you care about flag sharing, this is the only one that gives you a cheat log out of the box.
 
-**Audit trail.** Every lifecycle event is written with a severity, an actor and a details payload, and the console has a viewer for it. whale and owl do not document anything similar.
+- **Audit trail.** Every lifecycle event is written with a severity, an actor and a details payload, and the console has a viewer for it. whale and owl do not document anything similar.
 
-**Bulk import.** A CSV or Excel file creates a whole category at once, which matters on the day you are loading 40 challenges. rCTF uses YAML elsewhere, whale and owl have no import.
+- **Bulk import.** A CSV or Excel file creates a whole category at once, which matters on the day you are loading 40 challenges. rCTF uses YAML elsewhere, whale and owl have no import.
 
-**Dynamic scoring without extra work.** Linear and logarithmic decay are built in. The other CTFd container plugins either do not support it or require you to wire CTFd's own dynamic type separately.
+- **Dynamic scoring without extra work.** Linear and logarithmic decay are built in. The other CTFd container plugins either do not support it or require you to wire CTFd's own dynamic type separately.
 
 ## Where this plugin is worse
 
 These are real. If any of them is a hard requirement for your event, use another project.
 
-**Isolation is weaker than kCTF and rCTF.** This plugin drops all capabilities, adds three back, sets `no-new-privileges`, and puts containers on a bridge with inter-container communication disabled. There is no seccomp profile beyond Docker's default, no AppArmor profile, and the container runs as root inside its own namespace. That last part is deliberate, because many challenges ask the player to become root, but it does mean a kernel exploit is the boundary. kCTF runs challenges under nsjail on Kubernetes, and rCTF's own documentation opens with a warning to treat challenge images as hostile.
+- **Isolation is weaker than kCTF and rCTF.** This plugin drops all capabilities, adds three back, sets `no-new-privileges`, and puts containers on a bridge with inter-container communication disabled. There is no seccomp profile beyond Docker's default, no AppArmor profile, and the container runs as root inside its own namespace. That last part is deliberate, because many challenges ask the player to become root, but it does mean a kernel exploit is the boundary. kCTF runs challenges under nsjail on Kubernetes, and rCTF's own documentation opens with a warning to treat challenge images as hostile.
 
-**Inter-container traffic is not fully blocked.** I measured this on a live deployment. With `enable_icc=false`, another container cannot reach yours by IP, by name, or on an internal port, and ARP spoofing is blocked because there is no `CAP_NET_RAW`. But a published port is reachable through the bridge gateway, and Docker's embedded DNS lists every container name on the network. A team with code execution in their own container can reach another team's published port if they find the number. The practical impact depends on the challenge: a static service has nothing to steal, a challenge with private mutable state does. See [security.md](security.md) for the measurements and for the mitigations.
+- **Inter-container traffic is not fully blocked.** I measured this on a live deployment. With `enable_icc=false`, another container cannot reach yours by IP, by name, or on an internal port, and ARP spoofing is blocked because there is no `CAP_NET_RAW`. But a published port is reachable through the bridge gateway, and Docker's embedded DNS lists every container name on the network. A team with code execution in their own container can reach another team's published port if they find the number. The practical impact depends on the challenge: a static service has nothing to steal, a challenge with private mutable state does. See [security.md](security.md) for the measurements and for the mitigations.
 
-**Provisioning blocks the request.** `Fetch Instance` does not return until the container is running. With local images that is under a second, so it rarely matters, but a slow image pull keeps the HTTP request open. rCTF returns `starting` immediately and the client polls.
+- **Provisioning blocks the request.** `Fetch Instance` does not return until the container is running. With local images that is under a second, so it rarely matters, but a slow image pull keeps the HTTP request open. rCTF returns `starting` immediately and the client polls.
 
-**One Docker host.** There is no scheduler across several machines and no per-host port partitioning. whale uses Swarm, rCTF runs on Docker or Kubernetes, and kCTF is Kubernetes native. If you need several challenge hosts behind one CTFd, this plugin is not the tool.
+- **One Docker host.** There is no scheduler across several machines and no per-host port partitioning. whale uses Swarm, rCTF runs on Docker or Kubernetes, and kCTF is Kubernetes native. If you need several challenge hosts behind one CTFd, this plugin is not the tool.
 
-**Resource limits are global.** Memory, CPU and the process limit apply to every container. rCTF and kCTF configure resources per challenge. The columns for per-challenge limits exist in the model but the code ignores them.
+- **Resource limits are global.** Memory, CPU and the process limit apply to every container. rCTF and kCTF configure resources per challenge. The columns for per-challenge limits exist in the model but the code ignores them.
 
-**No multi-container challenges.** CTFd-owl was built for docker-compose challenges and this plugin cannot do them. If a challenge needs a web app plus a database, owl or rCTF is the right answer.
+- **No multi-container challenges.** CTFd-owl was built for docker-compose challenges and this plugin cannot do them. If a challenge needs a web app plus a database, owl or rCTF is the right answer.
 
-**No admin bot.** rCTF ships an admin bot for web challenges, including a queue and logs. This plugin has nothing for that.
+- **No admin bot.** rCTF ships an admin bot for web challenges, including a queue and logs. This plugin has nothing for that.
 
-**Testing is newer.** rCTF and kCTF are organised projects with their own test suites and continuous integration. The test suites in this repository were added during the review that produced version 2.1.0, so they are young.
+- **Testing is newer.** rCTF and kCTF are organised projects with their own test suites and continuous integration. The test suites in this repository were added during the review that produced version 2.1.0, so they are young.
 
 ## Choose by situation
 
