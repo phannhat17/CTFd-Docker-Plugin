@@ -1,0 +1,1059 @@
+{#
+  Standalone console for the containers plugin.
+
+  This page intentionally does NOT extend CTFd's admin base template: it ships
+  its own design system so the plugin UI is independent of the CTFd theme.
+  Bootstrap and the CTFd stylesheet are not loaded here at all.
+#}
+<!DOCTYPE html>
+<html lang="en" x-data="console()" x-init="boot()" :class="{ 'modal-open': modal.open || confirm.open }">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Containers · Console</title>
+  <style>
+    :root {
+      --bg:        #0e1117;
+      --surface:   #151a23;
+      --surface-2: #1b2230;
+      --line:      #242c3a;
+      --text:      #e6e9ef;
+      --muted:     #8b94a7;
+      --accent:    #4f8cff;
+      --accent-dim:#1e3a6b;
+      --ok:        #34d399;
+      --warn:      #fbbf24;
+      --err:       #f87171;
+      --info:      #60a5fa;
+      --radius:    10px;
+      --sidebar:   232px;
+    }
+
+    * { box-sizing: border-box; }
+
+    /* sections are hidden until Alpine initialises */
+    [x-cloak] { display: none !important; }
+
+    html, body {
+      margin: 0; padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    body.modal-open { overflow: hidden; }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    code, .mono {
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 12px;
+    }
+
+    /* ---------------------------------------------------------------- layout */
+    .layout { display: flex; min-height: 100vh; }
+
+    .sidebar {
+      width: var(--sidebar); flex: 0 0 var(--sidebar);
+      background: var(--surface);
+      border-right: 1px solid var(--line);
+      display: flex; flex-direction: column;
+      position: sticky; top: 0; height: 100vh;
+    }
+
+    .brand {
+      padding: 18px 18px 14px;
+      border-bottom: 1px solid var(--line);
+    }
+    .brand h1 { margin: 0; font-size: 15px; letter-spacing: .2px; }
+    .brand p { margin: 3px 0 0; color: var(--muted); font-size: 11.5px; }
+
+    .nav { padding: 10px 10px; display: flex; flex-direction: column; gap: 2px; }
+    .nav button {
+      display: flex; align-items: center; gap: 10px;
+      width: 100%; text-align: left;
+      padding: 9px 12px; border: 0; border-radius: 8px;
+      background: transparent; color: var(--muted);
+      font: inherit; cursor: pointer;
+    }
+    .nav button:hover { background: var(--surface-2); color: var(--text); }
+    .nav button.active { background: var(--accent-dim); color: #fff; }
+    .nav .count {
+      margin-left: auto; font-size: 11px; color: inherit; opacity: .8;
+      background: rgba(255,255,255,.07); border-radius: 999px; padding: 1px 7px;
+    }
+
+    .sidebar-foot {
+      margin-top: auto; padding: 14px 18px;
+      border-top: 1px solid var(--line);
+      font-size: 11.5px; color: var(--muted);
+    }
+    .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; }
+    .dot.up { background: var(--ok); }
+    .dot.down { background: var(--err); }
+
+    .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+    .topbar {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 22px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(21,26,35,.85);
+      position: sticky; top: 0; z-index: 20;
+      backdrop-filter: blur(8px);
+    }
+    .topbar h2 { margin: 0; font-size: 16px; }
+    .topbar .spacer { flex: 1; }
+
+    .content { padding: 22px; }
+
+    /* ---------------------------------------------------------------- pieces */
+    .btn {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 7px 13px; border-radius: 8px;
+      border: 1px solid var(--line); background: var(--surface-2); color: var(--text);
+      font: inherit; font-size: 13px; cursor: pointer;
+    }
+    .btn:hover { border-color: #33415a; }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .btn.danger  { background: #3a1d22; border-color: #5c2b33; color: #ffb4b4; }
+    .btn.ghost   { background: transparent; }
+    .btn.sm      { padding: 4px 9px; font-size: 12px; }
+
+    .card {
+      background: var(--surface); border: 1px solid var(--line);
+      border-radius: var(--radius); overflow: hidden;
+    }
+    .card + .card { margin-top: 16px; }
+    .card-head {
+      padding: 13px 16px; border-bottom: 1px solid var(--line);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .card-head h3 { margin: 0; font-size: 14px; }
+    .card-body { padding: 16px; }
+
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 18px; }
+    .stat {
+      background: var(--surface); border: 1px solid var(--line);
+      border-radius: var(--radius); padding: 13px 15px;
+    }
+    .stat .label { color: var(--muted); font-size: 11.5px; text-transform: uppercase; letter-spacing: .4px; }
+    .stat .value { font-size: 22px; font-weight: 600; margin-top: 3px; }
+
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 9px 14px; text-align: left; border-bottom: 1px solid var(--line); }
+    th { color: var(--muted); font-weight: 500; font-size: 11.5px; text-transform: uppercase; letter-spacing: .4px; }
+    tbody tr:hover { background: var(--surface-2); }
+    td.nowrap, th.nowrap { white-space: nowrap; }
+
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 2px 9px; border-radius: 999px; font-size: 11.5px; border: 1px solid transparent;
+    }
+    .badge.running      { background: rgba(52,211,153,.12); color: var(--ok);   border-color: rgba(52,211,153,.3); }
+    .badge.provisioning,
+    .badge.pending      { background: rgba(251,191,36,.12); color: var(--warn); border-color: rgba(251,191,36,.3); }
+    .badge.stopped,
+    .badge.stopping     { background: rgba(139,148,167,.12); color: var(--muted); border-color: rgba(139,148,167,.3); }
+    .badge.solved       { background: rgba(96,165,250,.12); color: var(--info); border-color: rgba(96,165,250,.3); }
+    .badge.error        { background: rgba(248,113,113,.12); color: var(--err); border-color: rgba(248,113,113,.3); }
+    .badge.sev-info     { background: rgba(139,148,167,.12); color: var(--muted); }
+    .badge.sev-warning  { background: rgba(251,191,36,.12); color: var(--warn); }
+    .badge.sev-error    { background: rgba(248,113,113,.12); color: var(--err); }
+    .badge.sev-critical { background: rgba(248,113,113,.2); color: #ff9b9b; }
+
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 12.5px; margin-bottom: 5px; }
+    .field .hint { color: var(--muted); font-size: 11.5px; margin-top: 4px; }
+    input[type=text], input[type=number], input[type=search], select, textarea {
+      width: 100%; padding: 8px 11px;
+      background: var(--bg); color: var(--text);
+      border: 1px solid var(--line); border-radius: 8px;
+      font: inherit; font-size: 13px;
+    }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+    input[type=checkbox] { accent-color: var(--accent); }
+
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+
+    .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-bottom: 14px; }
+    .toolbar .field { margin: 0; min-width: 150px; }
+
+    .empty { padding: 38px 16px; text-align: center; color: var(--muted); }
+
+    .toast {
+      position: fixed; right: 20px; bottom: 20px; z-index: 60;
+      background: var(--surface-2); border: 1px solid var(--line);
+      border-left: 3px solid var(--accent);
+      padding: 11px 15px; border-radius: 8px; max-width: 340px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.4);
+    }
+    .toast.err { border-left-color: var(--err); }
+    .toast.ok  { border-left-color: var(--ok); }
+
+    .overlay {
+      position: fixed; inset: 0; z-index: 50;
+      background: rgba(8,10,14,.72);
+      display: flex; align-items: center; justify-content: center; padding: 24px;
+    }
+    .modal {
+      background: var(--surface); border: 1px solid var(--line);
+      border-radius: 12px; width: 100%; max-width: 780px;
+      max-height: 85vh; display: flex; flex-direction: column;
+      box-shadow: 0 24px 60px rgba(0,0,0,.5);
+    }
+    .modal-head { padding: 14px 18px; border-bottom: 1px solid var(--line); display: flex; align-items: center; }
+    .modal-head h3 { margin: 0; font-size: 14px; }
+    .modal-body { padding: 18px; overflow: auto; }
+    .modal-foot { padding: 13px 18px; border-top: 1px solid var(--line); display: flex; gap: 9px; justify-content: flex-end; }
+
+    pre.logs {
+      margin: 0; padding: 14px; background: #0a0d12; border: 1px solid var(--line);
+      border-radius: 8px; overflow: auto; max-height: 55vh;
+      white-space: pre-wrap; word-break: break-word; font-size: 12px; color: #c9d1d9;
+    }
+
+    .pager { display: flex; align-items: center; gap: 10px; padding: 11px 16px; border-top: 1px solid var(--line); }
+    .pager .info { color: var(--muted); font-size: 12px; }
+
+    .droppable {
+      border: 1.5px dashed var(--line); border-radius: var(--radius);
+      padding: 28px; text-align: center; color: var(--muted); cursor: pointer;
+    }
+    .droppable:hover, .droppable.over { border-color: var(--accent); color: var(--text); }
+
+    .row-actions { display: flex; gap: 6px; }
+  </style>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+</head>
+<body>
+<div class="layout">
+
+  <!-- ------------------------------------------------------------ sidebar -->
+  <aside class="sidebar">
+    <div class="brand">
+      <h1>Containers</h1>
+      <p>Challenge instance console</p>
+    </div>
+
+    <nav class="nav">
+      <template x-for="tab in tabs" :key="tab.id">
+        <button :class="{ active: tab.id === current }" @click="go(tab.id)">
+          <span x-text="tab.label"></span>
+          <span class="count" x-show="tab.count !== undefined && tab.count !== null"
+                x-text="tab.count"></span>
+        </button>
+      </template>
+    </nav>
+
+    <div class="sidebar-foot">
+      <div><span class="dot" :class="health.connected ? 'up' : 'down'"></span>
+        <span x-text="health.connected ? 'Docker connected' : 'Docker unreachable'"></span>
+      </div>
+      <div style="margin-top:4px" x-show="health.version" x-text="'v' + (health.version || '')"></div>
+      <div style="margin-top:8px"><a href="/admin/containers/dashboard">Classic view →</a></div>
+    </div>
+  </aside>
+
+  <!-- --------------------------------------------------------------- main -->
+  <div class="main">
+    <header class="topbar">
+      <h2 x-text="tabs.find(t => t.id === current)?.label || ''"></h2>
+      <div class="spacer"></div>
+      <span class="badge" :class="health.connected ? 'running' : 'error'"
+            x-text="health.connected ? 'Docker OK' : 'Docker down'"></span>
+      <button class="btn sm" @click="refresh()" :disabled="loading">
+        <span x-text="loading ? 'Loading…' : 'Refresh'"></span>
+      </button>
+    </header>
+
+    <div class="content">
+
+      <!-- ==================================================== INSTANCES -->
+      <section x-show="current === 'instances'" x-cloak>
+        <div class="stats">
+          <div class="stat"><div class="label">Running</div><div class="value" x-text="stats.running ?? '—'"></div></div>
+          <div class="stat"><div class="label">Provisioning</div><div class="value" x-text="stats.provisioning ?? '—'"></div></div>
+          <div class="stat"><div class="label">Solved</div><div class="value" x-text="stats.solved ?? '—'"></div></div>
+          <div class="stat"><div class="label">Error</div><div class="value" x-text="stats.error ?? '—'"></div></div>
+          <div class="stat"><div class="label">Total</div><div class="value" x-text="stats.total_instances ?? '—'"></div></div>
+          <div class="stat"><div class="label">Free ports</div><div class="value" x-text="stats.available_ports ?? '—'"></div></div>
+        </div>
+
+        <div class="toolbar">
+          <div class="field">
+            <label>Status</label>
+            <select x-model="filters.status" @change="loadInstances()">
+              <option value="">All</option>
+              <option value="running">Running</option>
+              <option value="provisioning">Provisioning</option>
+              <option value="solved">Solved</option>
+              <option value="stopped">Stopped</option>
+              <option value="error">Error</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Challenge ID</label>
+            <input type="number" x-model="filters.challenge_id" @change="loadInstances()" placeholder="any">
+          </div>
+          <div class="field">
+            <label>Limit</label>
+            <select x-model.number="filters.limit" @change="loadInstances()">
+              <option :value="25">25</option>
+              <option :value="50">50</option>
+              <option :value="100">100</option>
+              <option :value="200">200</option>
+            </select>
+          </div>
+          <div class="spacer" style="flex:1"></div>
+          <button class="btn danger" @click="ask('Stop ALL running containers?', () => bulk('emergency-stop'))">
+            Emergency stop
+          </button>
+          <button class="btn danger" :disabled="!selected.length"
+                  @click="ask(`Delete ${selected.length} selected instance(s)?`, () => bulk('bulk-delete'))">
+            Delete selected <span x-show="selected.length" x-text="`(${selected.length})`"></span>
+          </button>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h3>Instances</h3>
+            <span class="badge stopped" x-text="instances.length + ' shown'"></span>
+          </div>
+          <div style="overflow:auto">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:34px"><input type="checkbox" @change="toggleAll($event)"></th>
+                  <th>Challenge</th>
+                  <th>Account</th>
+                  <th>Status</th>
+                  <th class="nowrap">Container</th>
+                  <th class="nowrap">Ports</th>
+                  <th class="nowrap">Expires</th>
+                  <th class="nowrap">Renewals</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="row in instances" :key="row.id">
+                  <tr>
+                    <td><input type="checkbox" :value="row.id" x-model.number="selected"></td>
+                    <td>
+                      <a :href="`/admin/challenges/${row.challenge_id}`" x-text="row.challenge_name"></a>
+                    </td>
+                    <td class="mono" x-text="row.account_id"></td>
+                    <td><span class="badge" :class="row.status" x-text="row.status"></span></td>
+                    <td class="mono" x-text="row.container_id ? row.container_id.slice(0, 12) : '—'"></td>
+                    <td class="mono" x-text="row.port || '—'"></td>
+                    <td class="nowrap" x-text="expiry(row.expires_at)"></td>
+                    <td x-text="row.renewal_count ?? 0"></td>
+                    <td>
+                      <div class="row-actions">
+                        <button class="btn sm ghost" @click="showLogs(row)" x-show="row.container_id">Logs</button>
+                        <button class="btn sm ghost" @click="stopOne(row)"
+                                x-show="['running','provisioning','pending'].includes(row.status)">Stop</button>
+                        <button class="btn sm danger" @click="deleteOne(row)">Delete</button>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+                <tr x-show="!instances.length && !loading">
+                  <td colspan="9"><div class="empty">No instances match these filters.</div></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="grid-2" style="margin-top:16px">
+          <div class="card">
+            <div class="card-head"><h3>Maintenance</h3></div>
+            <div class="card-body" style="display:flex; gap:9px; flex-wrap:wrap">
+              <button class="btn" @click="run('/admin/containers/api/cleanup/expired', 'Expired instances cleaned')">
+                Clean expired
+              </button>
+              <button class="btn" @click="run('/admin/containers/api/cleanup/old', 'Old records pruned')">
+                Prune old records
+              </button>
+              <button class="btn danger" @click="ask('Delete every solved instance record?', () => run('/admin/containers/api/bulk/cleanup-solved', 'Solved records deleted'))">
+                Delete solved records
+              </button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>Docker</h3></div>
+            <div class="card-body mono" style="color:var(--muted)">
+              <div>socket: <span x-text="health.socket || '—'"></span></div>
+              <div>version: <span x-text="health.version || '—'"></span></div>
+              <div x-show="health.server_info">
+                containers: <span x-text="health.server_info?.containers_running ?? '—'"></span> running /
+                <span x-text="health.server_info?.containers ?? '—'"></span> total ·
+                images: <span x-text="health.server_info?.images ?? '—'"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================================================== SETTINGS -->
+      <section x-show="current === 'settings'" x-cloak>
+        <div class="card">
+          <div class="card-head"><h3>Docker connection</h3></div>
+          <div class="card-body">
+            <div class="grid-2">
+              <div class="field">
+                <label>Connection type</label>
+                <select x-model="config.docker_type">
+                  <option value="local">Local socket</option>
+                  <option value="ssh">Remote over SSH</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Docker socket / base URL</label>
+                <input type="text" x-model="config.docker_socket">
+                <div class="hint">unix://var/run/docker.sock for the local daemon</div>
+              </div>
+            </div>
+            <div class="grid-2" x-show="config.docker_type === 'ssh'">
+              <div class="field">
+                <label>SSH host</label>
+                <input type="text" x-model="config.ssh_hostname">
+              </div>
+              <div class="field">
+                <label>SSH user</label>
+                <input type="text" x-model="config.ssh_user">
+              </div>
+              <div class="field">
+                <label>SSH port</label>
+                <input type="number" x-model="config.ssh_port">
+              </div>
+              <div class="field">
+                <label>Known hosts entry</label>
+                <input type="text" x-model="config.ssh_known_hosts">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h3>Instances</h3></div>
+          <div class="card-body">
+            <div class="grid-2">
+              <div class="field">
+                <label>Connection hostname shown to players</label>
+                <input type="text" x-model="config.connection_host" placeholder="challenges.example.com">
+                <div class="hint">Must differ from the CTFd hostname — see the README security section.</div>
+              </div>
+              <div class="field">
+                <label>Bind challenge ports to (optional)</label>
+                <input type="text" x-model="config.port_bind_ip" placeholder="0.0.0.0">
+              </div>
+              <div class="field">
+                <label>Default timeout (minutes)</label>
+                <input type="number" x-model="config.default_timeout">
+              </div>
+              <div class="field">
+                <label>Max renewals</label>
+                <input type="number" x-model="config.max_renewals">
+              </div>
+              <div class="field">
+                <label>Renewal extension (minutes)</label>
+                <input type="number" x-model="config.renew_extension_minutes">
+              </div>
+              <div class="field">
+                <label>Max concurrent containers per account</label>
+                <input type="number" x-model="config.container_max_concurrent_count">
+              </div>
+              <div class="field">
+                <label>Memory limit</label>
+                <input type="text" x-model="config.max_memory" placeholder="512m">
+              </div>
+              <div class="field">
+                <label>CPU limit</label>
+                <input type="text" x-model="config.max_cpu" placeholder="0.5">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h3>Ports &amp; networks</h3></div>
+          <div class="card-body">
+            <div class="grid-2">
+              <div class="field">
+                <label>Port range start</label>
+                <input type="number" x-model="config.port_range_start">
+              </div>
+              <div class="field">
+                <label>Port range end</label>
+                <input type="number" x-model="config.port_range_end">
+              </div>
+              <div class="field">
+                <label>Isolated network</label>
+                <input type="text" x-model="config.isolated_network">
+              </div>
+              <div class="field">
+                <label>Subdomain network</label>
+                <input type="text" x-model="config.subdomain_network">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h3>Subdomain routing (Traefik)</h3></div>
+          <div class="card-body">
+            <div class="field">
+              <label><input type="checkbox" x-model="bool.subdomain_enabled"> Enable subdomain routing</label>
+              <div class="hint">Only applies to challenges with an http/https connection type.</div>
+            </div>
+            <div class="grid-2" x-show="bool.subdomain_enabled">
+              <div class="field">
+                <label>Base domain</label>
+                <input type="text" x-model="config.subdomain_base_domain" placeholder="challenges.example.com">
+              </div>
+              <div class="field">
+                <label>Traefik entrypoint</label>
+                <input type="text" x-model="config.subdomain_entrypoint" placeholder="web">
+              </div>
+            </div>
+            <div class="field" x-show="bool.subdomain_enabled">
+              <label><input type="checkbox" x-model="bool.subdomain_tls"> Use TLS (https links)</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h3>Anti-cheat &amp; retention</h3></div>
+          <div class="card-body">
+            <div class="grid-2">
+              <div class="field">
+                <label>Auto-ban threshold</label>
+                <input type="number" x-model="config.anticheat_autoban_threshold">
+                <div class="hint">0 = never auto-ban (recommended). Above 0 bans both accounts after N detections.</div>
+              </div>
+              <div class="field">
+                <label>Audit retention (days)</label>
+                <input type="number" x-model="config.audit_retention_days">
+              </div>
+            </div>
+            <div class="field">
+              <label><input type="checkbox" x-model="bool.anticheat_log_all_attempts"> Log every flag attempt</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h3>Notifications</h3></div>
+          <div class="card-body">
+            <div class="field">
+              <label>Discord webhook URL</label>
+              <input type="text" x-model="config.container_discord_webhook_url"
+                     placeholder="https://discord.com/api/webhooks/...">
+            </div>
+            <div style="display:flex; gap:9px; flex-wrap:wrap">
+              <button class="btn" @click="testWebhook('connection')">Test connection</button>
+              <button class="btn" @click="testWebhook('demo_cheat')">Demo cheat alert</button>
+              <button class="btn" @click="testWebhook('demo_error')">Demo error alert</button>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:16px; display:flex; gap:9px">
+          <button class="btn primary" @click="saveConfig()" :disabled="saving">
+            <span x-text="saving ? 'Saving…' : 'Save settings'"></span>
+          </button>
+          <button class="btn ghost" @click="loadConfig()">Discard changes</button>
+        </div>
+      </section>
+
+      <!-- ======================================================== CHEATS -->
+      <section x-show="current === 'cheats'" x-cloak>
+        <div class="card">
+          <div class="card-head">
+            <h3>Flag reuse detections</h3>
+            <span class="badge error" x-text="`${cheats.total} total`"></span>
+          </div>
+          <div style="overflow:auto">
+            <table>
+              <thead>
+                <tr>
+                  <th class="nowrap">When</th>
+                  <th>Challenge</th>
+                  <th>Submitted by</th>
+                  <th>Flag owner</th>
+                  <th class="nowrap">IP</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="row in cheats.rows" :key="row.id">
+                  <tr>
+                    <td class="nowrap" x-text="when(row.timestamp)"></td>
+                    <td x-text="row.challenge_name"></td>
+                    <td><span class="badge error" x-text="row.submitted_by"></span></td>
+                    <td><span class="badge solved" x-text="row.flag_owner || '—'"></span></td>
+                    <td class="mono" x-text="row.ip_address || '—'"></td>
+                  </tr>
+                </template>
+                <tr x-show="!cheats.rows.length">
+                  <td colspan="5"><div class="empty">No flag reuse detected.</div></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="pager">
+            <button class="btn sm" :disabled="cheats.page <= 1" @click="loadCheats(cheats.page - 1)">Previous</button>
+            <span class="info">page <span x-text="cheats.page"></span> / <span x-text="Math.max(cheats.pages, 1)"></span></span>
+            <button class="btn sm" :disabled="cheats.page >= cheats.pages" @click="loadCheats(cheats.page + 1)">Next</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>What counts as reuse</h3></div>
+          <div class="card-body" style="color:var(--muted)">
+            A player submitted a flag that belongs to a different team/user.
+            With the auto-ban threshold at 0 nothing is banned automatically;
+            set a threshold in Settings to ban both accounts after repeated detections.
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================================= AUDIT -->
+      <section x-show="current === 'audit'" x-cloak>
+        <div class="toolbar">
+          <div class="field">
+            <label>Event</label>
+            <select x-model="auditFilters.event_type" @change="loadAudit()">
+              <option value="">All events</option>
+              <template x-for="ev in audit.event_types" :key="ev">
+                <option :value="ev" x-text="ev"></option>
+              </template>
+            </select>
+          </div>
+          <div class="field">
+            <label>Severity</label>
+            <select x-model="auditFilters.severity" @change="loadAudit()">
+              <option value="">Any</option>
+              <option value="info">info</option>
+              <option value="warning">warning</option>
+              <option value="error">error</option>
+              <option value="critical">critical</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Search</label>
+            <input type="search" x-model="auditFilters.q" @change="loadAudit()" placeholder="event or IP">
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h3>Audit trail</h3>
+            <span class="badge stopped" x-text="`${audit.total} entries`"></span>
+          </div>
+          <div style="overflow:auto">
+            <table>
+              <thead>
+                <tr>
+                  <th class="nowrap">When</th>
+                  <th>Event</th>
+                  <th>Severity</th>
+                  <th class="nowrap">Challenge</th>
+                  <th class="nowrap">Account</th>
+                  <th class="nowrap">IP</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="row in audit.rows" :key="row.id">
+                  <tr>
+                    <td class="nowrap" x-text="when(row.timestamp)"></td>
+                    <td class="mono" x-text="row.event_type"></td>
+                    <td><span class="badge" :class="'sev-' + row.severity" x-text="row.severity"></span></td>
+                    <td class="mono" x-text="row.challenge_id ?? '—'"></td>
+                    <td class="mono" x-text="row.account_id ?? '—'"></td>
+                    <td class="mono" x-text="row.ip_address || '—'"></td>
+                    <td class="mono" style="color:var(--muted); max-width:320px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap"
+                        :title="JSON.stringify(row.details || {})"
+                        x-text="JSON.stringify(row.details || {})"></td>
+                  </tr>
+                </template>
+                <tr x-show="!audit.rows.length">
+                  <td colspan="7"><div class="empty">No audit entries match.</div></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="pager">
+            <button class="btn sm" :disabled="audit.page <= 1" @click="loadAudit(audit.page - 1)">Previous</button>
+            <span class="info">page <span x-text="audit.page"></span> / <span x-text="Math.max(audit.pages, 1)"></span></span>
+            <button class="btn sm" :disabled="audit.page >= audit.pages" @click="loadAudit(audit.page + 1)">Next</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================== IMPORT -->
+      <section x-show="current === 'import'" x-cloak>
+        <div class="card">
+          <div class="card-head"><h3>Import challenges</h3></div>
+          <div class="card-body">
+            <div class="droppable"
+                 :class="{ over: dragOver }"
+                 @click="$refs.file.click()"
+                 @dragover.prevent="dragOver = true"
+                 @dragleave.prevent="dragOver = false"
+                 @drop.prevent="dragOver = false; pickFile($event.dataTransfer.files[0])">
+              <div>Drop a CSV or Excel file here, or click to choose</div>
+              <div class="hint" style="color:var(--muted); margin-top:6px"
+                   x-text="importFile ? importFile.name : 'Accepted: .csv, .xlsx, .xls'"></div>
+            </div>
+            <input type="file" x-ref="file" accept=".csv,.xlsx,.xls" style="display:none"
+                   @change="pickFile($event.target.files[0])">
+
+            <div style="margin-top:14px; display:flex; gap:9px; flex-wrap:wrap">
+              <button class="btn primary" :disabled="!importFile || importing" @click="doImport()">
+                <span x-text="importing ? 'Importing…' : 'Import'"></span>
+              </button>
+              <a class="btn ghost" href="/admin/containers/download-template">Download CSV template</a>
+            </div>
+
+            <div x-show="importResult" style="margin-top:16px">
+              <div class="badge" :class="importResult?.created ? 'running' : 'error'"
+                   x-text="`${importResult?.created ?? 0} created`"></div>
+              <template x-if="importResult?.errors?.length">
+                <div style="margin-top:10px">
+                  <div style="color:var(--warn); margin-bottom:6px"
+                       x-text="`${importResult.errors.length} row(s) reported problems:`"></div>
+                  <pre class="logs" x-text="importResult.errors.join('\n')"></pre>
+                </div>
+              </template>
+              <template x-if="importResult?.error">
+                <div style="margin-top:10px; color:var(--err)" x-text="importResult.error"></div>
+              </template>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h3>CSV columns</h3></div>
+          <div class="card-body mono" style="color:var(--muted); line-height:1.9">
+            name, category, description, image, internal_port, internal_ports, command,
+            connection_type, connection_info, flag_pattern, scoring_type, value,
+            initial, decay, minimum, decay_function, state
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<!-- ------------------------------------------------------------- toast -->
+<div class="toast" x-show="toast.show" x-cloak
+     :class="{ err: toast.kind === 'err', ok: toast.kind === 'ok' }"
+     x-text="toast.message"></div>
+
+<!-- ------------------------------------------------------- confirm modal -->
+<template x-if="confirm.open">
+<div class="overlay" @keydown.escape.window="confirm.open = false" @click.self="confirm.open = false">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-head"><h3>Confirm</h3></div>
+    <div class="modal-body" x-text="confirm.message"></div>
+    <div class="modal-foot">
+      <button class="btn ghost" @click="confirm.open = false">Cancel</button>
+      <button class="btn danger" @click="confirm.open = false; confirm.action && confirm.action()">Confirm</button>
+    </div>
+  </div>
+</div>
+</template>
+
+<!-- ---------------------------------------------------------- log modal -->
+<template x-if="modal.open">
+<div class="overlay" @keydown.escape.window="modal.open = false" @click.self="modal.open = false">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 x-text="`Logs · ${modal.title}`"></h3>
+    </div>
+    <div class="modal-body">
+      <pre class="logs" x-text="modal.loading ? 'Loading…' : (modal.logs || 'No output.')"></pre>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" @click="modal.open = false">Close</button>
+    </div>
+  </div>
+</div>
+</template>
+
+<script>
+function console() {
+  const CSRF = {{ csrf_token | tojson }};
+
+  return {
+    // ------------------------------------------------------------- state
+    current: (location.hash || '#instances').slice(1),
+    tabs: [
+      { id: 'instances', label: 'Instances' },
+      { id: 'settings',  label: 'Settings' },
+      { id: 'cheats',    label: 'Cheat logs' },
+      { id: 'audit',     label: 'Audit log' },
+      { id: 'import',    label: 'Import' },
+    ],
+    loading: false,
+    saving: false,
+    health: {},
+    stats: {},
+    instances: [],
+    selected: [],
+    filters: { status: '', challenge_id: '', limit: 50 },
+    config: {},
+    bool: {},
+    cheats: { rows: [], page: 1, pages: 1, total: 0 },
+    audit: { rows: [], page: 1, pages: 1, total: 0, event_types: [] },
+    auditFilters: { event_type: '', severity: '', q: '' },
+    modal: { open: false, title: '', logs: '', loading: false },
+    confirm: { open: false, message: '', action: null },
+    toast: { show: false, message: '', kind: 'ok' },
+    importFile: null,
+    importResult: null,
+    importing: false,
+    dragOver: false,
+
+    // -------------------------------------------------------------- boot
+    boot() {
+      window.addEventListener('hashchange', () => {
+        const id = (location.hash || '#instances').slice(1);
+        if (this.tabs.some(t => t.id === id)) this.current = id;
+      });
+      this.loadHealth();
+      this.refresh();
+    },
+
+    go(id) {
+      this.current = id;
+      history.replaceState(null, '', '#' + id);
+      this.refresh();
+    },
+
+    refresh() {
+      if (this.current === 'instances') { this.loadStats(); this.loadInstances(); }
+      else if (this.current === 'settings') this.loadConfig();
+      else if (this.current === 'cheats') this.loadCheats(1);
+      else if (this.current === 'audit') this.loadAudit(1);
+      else if (this.current === 'import') this.loadHealth();
+    },
+
+    // ------------------------------------------------------------ helpers
+    async api(path, options = {}) {
+      const opts = Object.assign({ headers: {} }, options);
+      opts.headers['Accept'] = 'application/json';
+      opts.headers['CSRF-Token'] = CSRF;
+
+      // CTFd only validates the CSRF-Token header when the request announces
+      // itself as application/json. Without this, a body-less POST (stop,
+      // cleanup, delete...) is treated as a form and rejected with 403, and a
+      // body-less fetch also defaults to Content-Type: text/plain.
+      if (opts.body === undefined || opts.body === null) {
+        opts.method = opts.method || 'GET';
+        if (opts.method !== 'GET' && opts.method !== 'HEAD') {
+          opts.body = '{}';
+        }
+      }
+      if (opts.body && typeof opts.body !== 'string' && !(opts.body instanceof FormData)) {
+        opts.body = JSON.stringify(opts.body);
+      }
+      if (typeof opts.body === 'string' && opts.body.length) {
+        opts.headers['Content-Type'] = 'application/json';
+      }
+
+      const res = await fetch(path, opts);
+      let data = {};
+      try { data = await res.json(); } catch (e) { data = {}; }
+      if (!res.ok && !data.error) data.error = `HTTP ${res.status}`;
+      return data;
+    },
+
+    notify(message, kind = 'ok') {
+      this.toast = { show: true, message, kind };
+      setTimeout(() => { this.toast.show = false; }, 4200);
+    },
+
+    ask(message, action) {
+      this.confirm = { open: true, message, action };
+    },
+
+    when(value) {
+      if (!value) return '—';
+      const d = new Date(value.endsWith && !value.endsWith('Z') ? value + 'Z' : value);
+      return isNaN(d) ? value : d.toLocaleString();
+    },
+
+    expiry(value) {
+      if (!value) return '—';
+      const d = new Date(value.endsWith && !value.endsWith('Z') ? value + 'Z' : value);
+      if (isNaN(d)) return value;
+      const secs = Math.round((d - Date.now()) / 1000);
+      const stamp = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      if (secs < 0) return `expired (${stamp})`;
+      if (secs < 90) return `in ${secs}s`;
+      return `in ${Math.round(secs / 60)}m (${stamp})`;
+    },
+
+    // ------------------------------------------------------------ loading
+    async loadHealth() {
+      const data = await this.api('/admin/containers/api/docker/health');
+      this.health = {
+        connected: !!data.connected,
+        version: data.docker_version,
+        socket: data.socket,
+        server_info: data.server_info,
+      };
+    },
+
+    async loadStats() {
+      this.stats = await this.api('/admin/containers/api/stats');
+    },
+
+    async loadInstances() {
+      this.loading = true;
+      const params = new URLSearchParams();
+      if (this.filters.status) params.set('status', this.filters.status);
+      if (this.filters.challenge_id) params.set('challenge_id', this.filters.challenge_id);
+      params.set('limit', this.filters.limit);
+      const data = await this.api('/admin/containers/api/instances?' + params.toString());
+      this.instances = data.instances || [];
+      this.selected = [];
+      const running = this.instances.filter(i => ['running', 'provisioning', 'pending'].includes(i.status)).length;
+      this.tabs = this.tabs.map(t => t.id === 'instances' ? Object.assign({}, t, { count: running || null }) : t);
+      this.loading = false;
+      if (data.error) this.notify(data.error, 'err');
+    },
+
+    async loadConfig() {
+      const data = await this.api('/admin/containers/api/config');
+      this.config = data.config || {};
+      this.bool = {
+        subdomain_enabled: this.config.subdomain_enabled === 'true',
+        subdomain_tls: this.config.subdomain_tls === 'true',
+        anticheat_log_all_attempts: this.config.anticheat_log_all_attempts !== 'false',
+      };
+    },
+
+    async loadCheats(page = 1) {
+      const data = await this.api(`/admin/containers/api/cheats/page?page=${page}&per_page=25`);
+      if (data.error) { this.notify(data.error, 'err'); return; }
+      this.cheats = { rows: data.cheats || [], page: data.page, pages: data.pages, total: data.total };
+    },
+
+    async loadAudit(page = 1) {
+      const params = new URLSearchParams({ page, per_page: 25 });
+      if (this.auditFilters.event_type) params.set('event_type', this.auditFilters.event_type);
+      if (this.auditFilters.severity) params.set('severity', this.auditFilters.severity);
+      if (this.auditFilters.q) params.set('q', this.auditFilters.q);
+      const data = await this.api('/admin/containers/api/audit?' + params.toString());
+      if (data.error) { this.notify(data.error, 'err'); return; }
+      this.audit = {
+        rows: data.entries || [], page: data.page, pages: data.pages,
+        total: data.total, event_types: data.event_types || [],
+      };
+    },
+
+    // ------------------------------------------------------------ actions
+    toggleAll(event) {
+      this.selected = event.target.checked ? this.instances.map(i => i.id) : [];
+    },
+
+    async stopOne(row) {
+      const data = await this.api(`/admin/containers/api/instances/${row.id}/stop`, { method: 'POST' });
+      if (data.success) { this.notify('Instance stopped'); this.refresh(); }
+      else this.notify(data.error || 'Could not stop instance', 'err');
+    },
+
+    deleteOne(row) {
+      this.ask(`Delete instance ${row.uuid ? row.uuid.slice(0, 8) : row.id}?`, async () => {
+        const data = await this.api(`/admin/containers/api/instances/${row.id}`, { method: 'DELETE' });
+        if (data.success) { this.notify('Instance deleted'); this.refresh(); }
+        else this.notify(data.error || 'Could not delete instance', 'err');
+      });
+    },
+
+    async bulk(kind) {
+      const ids = this.selected.slice();
+      const path = kind === 'emergency-stop'
+        ? '/admin/containers/api/bulk/emergency-stop'
+        : '/admin/containers/api/bulk-delete';
+      const body = kind === 'emergency-stop' ? null : { instance_ids: ids };
+      const data = await this.api(path, { method: 'POST', body });
+      if (data.error) { this.notify(data.error, 'err'); return; }
+      this.notify(kind === 'emergency-stop'
+        ? `Stopped ${data.stopped} instance(s)`
+        : `Deleted ${data.deleted} instance(s)`);
+      this.refresh();
+    },
+
+    async run(path, message) {
+      const data = await this.api(path, { method: 'POST' });
+      if (data.error) { this.notify(data.error, 'err'); return; }
+      this.notify(message);
+      this.refresh();
+    },
+
+    async saveConfig() {
+      this.saving = true;
+      const payload = Object.assign({}, this.config);
+      Object.keys(this.bool).forEach(key => { payload[key] = this.bool[key] ? 'true' : 'false'; });
+      const data = await this.api('/admin/containers/api/config', { method: 'POST', body: payload });
+      this.saving = false;
+      const notes = (data.errors || []).filter(Boolean);
+      if (data.success === false) {
+        this.notify(notes.join(' · ') || data.error || 'Could not save settings', 'err');
+      } else {
+        this.notify(notes.length ? 'Saved with notes: ' + notes.join(' · ') : 'Settings saved');
+        this.loadConfig();
+        this.loadHealth();
+      }
+    },
+
+    async testWebhook(kind) {
+      const data = await this.api('/admin/containers/api/notifications/test', {
+        method: 'POST',
+        body: { type: kind, url: this.config.container_discord_webhook_url },
+      });
+      this.notify(data.success ? 'Test notification sent' : (data.error || 'Webhook failed'),
+                  data.success ? 'ok' : 'err');
+    },
+
+    async showLogs(row) {
+      this.modal = { open: true, title: row.challenge_name, logs: '', loading: true };
+      const data = await this.api(`/admin/containers/api/instances/${row.id}/logs`);
+      this.modal.loading = false;
+      this.modal.logs = data.logs || data.error || 'No output.';
+    },
+
+    // ------------------------------------------------------------- import
+    pickFile(file) {
+      this.importFile = file || null;
+      this.importResult = null;
+    },
+
+    async doImport() {
+      if (!this.importFile) return;
+      this.importing = true;
+      const form = new FormData();
+      form.append('file', this.importFile);
+      form.append('nonce', CSRF);
+      const res = await fetch('/admin/containers/api/import', { method: 'POST', body: form });
+      let data = {};
+      try { data = await res.json(); } catch (e) { data = { error: `HTTP ${res.status}` }; }
+      this.importing = false;
+      this.importResult = data;
+      if (data.created) this.notify(`Imported ${data.created} challenge(s)`);
+      else if (data.error) this.notify(data.error, 'err');
+      this.loadHealth();
+    },
+  };
+}
+</script>
+</body>
+</html>

@@ -8,7 +8,7 @@ CTFd._internal.challenge.submit = function (preview) {
     var challenge_id = parseInt(CTFd.lib.$("#challenge-id").val());
     var submission = CTFd.lib.$("#challenge-input").val().trim();
 
-    let alert = resetAlert();
+    resetAlert();
 
     var body = {
         challenge_id: challenge_id,
@@ -19,110 +19,272 @@ CTFd._internal.challenge.submit = function (preview) {
         params["preview"] = true;
     }
 
-    return CTFd.api
-        .post_challenge_attempt(params, body)
-        .then(function (response) {
-            if (response.status === 429) return response; // Rate limit
-            if (response.status === 403) return response; // Not logged in / CTF paused
-            return response;
-        });
+    return CTFd.api.post_challenge_attempt(params, body).then(function (response) {
+        return response;
+    });
 };
 
-function mergeQueryParams(parameters, queryParameters) {
-    if (parameters.$queryParameters) {
-        Object.keys(parameters.$queryParameters).forEach(function (parameterName) {
-            queryParameters[parameterName] = parameters.$queryParameters[parameterName];
-        });
+function el(id) {
+    return document.getElementById(id);
+}
+
+function setAlert(message, isError) {
+    var alert = el("deployment-info");
+    if (!alert) return null;
+    // textContent everywhere: instance/host data is operator supplied and must
+    // never be interpreted as markup.
+    alert.textContent = "";
+    alert.classList.toggle("alert-danger", !!isError);
+    if (message !== undefined && message !== null) {
+        alert.append(message);
     }
-    return queryParameters;
+    return alert;
+}
+
+function setButtonsDisabled(disabled) {
+    ["create-chal", "extend-chal", "terminate-chal"].forEach(function (id) {
+        var button = el(id);
+        if (button) button.disabled = disabled;
+    });
+}
+
+function resetTerminateButton() {
+    endTerminateConfirm(el("terminate-chal"));
+}
+
+function beginTerminateConfirm(button) {
+    button.dataset.confirming = "1";
+    button.dataset.originalHtml = button.innerHTML;
+    button.classList.add("terminate-confirming");
+    // Plain text: a polling refresh must not be able to overwrite the button
+    // while the player is deciding.
+    button.textContent = "Click again to confirm";
+    button.dataset.resetTimer = String(setTimeout(function () {
+        endTerminateConfirm(button);
+    }, 5000));
+}
+
+function endTerminateConfirm(button) {
+    if (!button || button.dataset.confirming !== "1") return;
+    clearTimeout(parseInt(button.dataset.resetTimer || "0", 10));
+    button.dataset.confirming = "0";
+    button.classList.remove("terminate-confirming");
+    if (button.dataset.originalHtml) {
+        button.innerHTML = button.dataset.originalHtml;
+        delete button.dataset.originalHtml;
+    }
+}
+
+function setRenewLabel(minutes) {
+    var button = el("extend-chal");
+    if (!button || !minutes) return;
+    var label = button.querySelector("small");
+    if (label) {
+        label.textContent = " Extend +" + minutes + "m ";
+    }
 }
 
 function resetAlert() {
-    let alert = document.getElementById("deployment-info");
-    alert.innerHTML = '<div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>';
-    alert.classList.remove("alert-danger");
-
-    // Disable buttons while loading
-    document.getElementById("create-chal").disabled = true;
-    document.getElementById("extend-chal").disabled = true;
-    document.getElementById("terminate-chal").disabled = true;
-
+    var alert = setAlert("");
+    if (alert) {
+        var spinner = document.createElement("div");
+        spinner.className = "spinner-border text-primary";
+        spinner.setAttribute("role", "status");
+        var hidden = document.createElement("span");
+        hidden.className = "visually-hidden";
+        hidden.textContent = "Loading...";
+        spinner.appendChild(hidden);
+        alert.appendChild(spinner);
+    }
+    setButtonsDisabled(true);
     return alert;
 }
 
 function enableButtons() {
-    document.getElementById("create-chal").disabled = false;
-    document.getElementById("extend-chal").disabled = false;
-    document.getElementById("terminate-chal").disabled = false;
+    setButtonsDisabled(false);
 }
 
 function toggleChallengeCreate() {
-    const btn = document.getElementById("create-chal");
-    if (btn) {
-        btn.classList.remove('d-none');
-    }
+    var btn = el("create-chal");
+    if (btn) btn.classList.remove("d-none");
 }
 
 function hideChallengeCreate() {
-    const btn = document.getElementById("create-chal");
-    if (btn) {
-        btn.classList.add('d-none');
-    }
+    var btn = el("create-chal");
+    if (btn) btn.classList.add("d-none");
 }
 
 function toggleChallengeUpdate() {
-    const extendBtn = document.getElementById("extend-chal");
-    const terminateBtn = document.getElementById("terminate-chal");
-    if (extendBtn) extendBtn.classList.remove('d-none');
-    if (terminateBtn) terminateBtn.classList.remove('d-none');
+    ["extend-chal", "terminate-chal"].forEach(function (id) {
+        var btn = el(id);
+        if (btn) btn.classList.remove("d-none");
+    });
 }
 
 function hideChallengeUpdate() {
-    const extendBtn = document.getElementById("extend-chal");
-    const terminateBtn = document.getElementById("terminate-chal");
-    if (extendBtn) extendBtn.classList.add('d-none');
-    if (terminateBtn) terminateBtn.classList.add('d-none');
-}
-
-function calculateExpiry(date) {
-    return Math.ceil((new Date(date * 1000) - new Date()) / 1000 / 60);
+    ["extend-chal", "terminate-chal"].forEach(function (id) {
+        var btn = el(id);
+        if (btn) btn.classList.add("d-none");
+    });
+    // buttons are hidden only while the instance is gone/stopped, so a
+    // half-finished confirmation cannot survive.
+    resetTerminateButton();
 }
 
 function formatExpiry(timestampMs) {
-    const secondsLeft = Math.ceil((timestampMs - Date.now()) / 1000);
+    if (!timestampMs) return "unknown";
+    var secondsLeft = Math.ceil((timestampMs - Date.now()) / 1000);
     if (secondsLeft < 0) {
         return "Expired";
     } else if (secondsLeft < 60) {
         return "Expires in " + secondsLeft + " seconds";
+    }
+    return "Expires in " + Math.ceil(secondsLeft / 60) + " minutes";
+}
+
+function appendLink(parent, url) {
+    var link = document.createElement("a");
+    link.href = url;
+    link.textContent = url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    parent.append(link, document.createElement("br"));
+}
+
+function appendExtraInfo(parent, info) {
+    if (!info) return;
+    if (parent.lastChild && parent.lastChild.tagName === "BR") {
+        parent.removeChild(parent.lastChild);
+    }
+    var small = document.createElement("small");
+    small.textContent = info;
+    parent.append(document.createElement("br"), small);
+}
+
+function renderConnectionInfo(connection, parent) {
+    if (!connection) return;
+    var info = connection.info;
+
+    // Subdomain routing: a list of per-port URLs
+    if (connection.type === "url_list" && connection.urls && connection.urls.length) {
+        connection.urls.forEach(function (item) {
+            appendLink(parent, item.url);
+        });
+        appendExtraInfo(parent, info);
+        return;
+    }
+
+    var ports = connection.ports;
+    var hasPorts = ports && Object.keys(ports).length > 0;
+    var type = (connection.type || "").toLowerCase();
+
+    if (type === "tcp" || type === "nc" || type === "ssh") {
+        var targets = hasPorts ? Object.values(ports) : [connection.port];
+        targets.forEach(function (external) {
+            var code = document.createElement("code");
+            if (type === "ssh") {
+                code.textContent = "ssh -p " + external + " user@" + connection.host;
+            } else {
+                code.textContent = "nc " + connection.host + " " + external;
+            }
+            parent.append(code, document.createElement("br"));
+        });
+    } else if (type === "https") {
+        appendLink(parent, "https://" + connection.host);
+    } else if (type === "http" || type === "web" || type === "url") {
+        var scheme = window.location.protocol === "https:" ? "https://" : "http://";
+        var hosts = hasPorts
+            ? Object.values(ports).map(function (external) {
+                return scheme + connection.host + ":" + external;
+            })
+            : [scheme + connection.host + ":" + connection.port];
+        hosts.forEach(function (url) { appendLink(parent, url); });
     } else {
-        const minutesLeft = Math.ceil(secondsLeft / 60);
-        return "Expires in " + minutesLeft + " minutes";
+        // Unknown/custom type: show host:port pairs
+        var pairs = hasPorts
+            ? Object.values(ports).map(function (external) {
+                return connection.host + ":" + external;
+            })
+            : [connection.host + ":" + connection.port];
+        pairs.forEach(function (pair) {
+            var code = document.createElement("code");
+            code.textContent = pair;
+            parent.append(code, document.createElement("br"));
+        });
+    }
+
+    appendExtraInfo(parent, info);
+}
+
+function applyInstancePayload(data) {
+    var alert = setAlert("");
+    if (!alert) return;
+
+    if (data.renew_minutes) setRenewLabel(data.renew_minutes);
+    else {
+        var panel = document.querySelector(".deployment-actions");
+        if (panel && panel.dataset.renewMinutes) setRenewLabel(panel.dataset.renewMinutes);
+    }
+
+    var expires = document.createElement("span");
+    expires.textContent = formatExpiry(data.expires_at);
+    alert.append(expires, document.createElement("br"));
+    renderConnectionInfo(data.connection, alert);
+
+    if (data.status === "provisioning" || data.instance_status === "provisioning") {
+        var note = document.createElement("small");
+        note.className = "text-muted d-block";
+        note.textContent = "Container is still starting up - this page refreshes automatically.";
+        alert.appendChild(note);
     }
 }
 
-function createChallengeLinkElement(data, parent) {
-    parent.innerHTML = "";
+function showError(message) {
+    setAlert(message || "Unknown error", true);
+    hideChallengeUpdate();
+    toggleChallengeCreate();
+}
 
-    let expires = document.createElement('span');
-    expires.textContent = formatExpiry(data.expires_at);
-    parent.append(expires, document.createElement('br'));
+var provisioningPoll = null;
+//: Challenge whose data is currently painted into the shared modal DOM.
+//: CTFd reuses one modal element for every challenge, so a panel left over
+//: from the previously opened challenge would otherwise keep showing its
+//: connection details (and stealing the next request's response).
+var displayedChallengeId = null;
 
-    if (data.connect == "tcp") {
-        let codeElement = document.createElement('code');
-        codeElement.textContent = 'nc ' + data.hostname + " " + data.port;
-        parent.append(codeElement);
-    } else {
-        let link = document.createElement('a');
-        link.href = 'http://' + data.hostname + ":" + data.port;
-        link.textContent = 'http://' + data.hostname + ":" + data.port;
-        link.target = '_blank';
-        parent.append(link);
+function cancelProvisioningPoll() {
+    if (provisioningPoll) {
+        clearTimeout(provisioningPoll);
+        provisioningPoll = null;
     }
+}
+
+function scheduleProvisioningPoll(challenge_id) {
+    cancelProvisioningPoll();
+    provisioningPoll = setTimeout(function () {
+        provisioningPoll = null;
+        view_container_info(challenge_id);
+    }, 5000);
+}
+
+function resetPanelFor(challenge_id) {
+    displayedChallengeId = challenge_id;
+    cancelProvisioningPoll();
+    setAlert("");                 // drop the previous challenge's connection info
+    resetTerminateButton();
+    hideChallengeUpdate();
+    toggleChallengeCreate();
 }
 
 function view_container_info(challenge_id) {
-    // console.log("[Container] Fetching info for challenge", challenge_id);
-    let alert = resetAlert();
+    // The panel in the DOM may belong to a different challenge; never let it
+    // keep showing that challenge's host/port while this request is in flight.
+    if (displayedChallengeId !== null && displayedChallengeId !== challenge_id) {
+        resetPanelFor(challenge_id);
+    }
+
+    displayedChallengeId = challenge_id;
+    resetAlert();
 
     fetch("/api/v1/containers/info/" + challenge_id, {
         method: "GET",
@@ -131,43 +293,46 @@ function view_container_info(challenge_id) {
             "CSRF-Token": init.csrfNonce
         }
     })
-        .then(response => response.json())
-        .then(data => {
-            // console.log("[Container] Info response:", data);
-            alert.innerHTML = ""; // Remove spinner
+        .then(function (response) { return response.json(); })
+        .then(function (data) {
+            // A response for a challenge the player has already navigated away
+            // from must never be painted.
+            if (displayedChallengeId !== challenge_id) return;
 
-            if (data.status == "not_found") {
-                alert.innerHTML = "No active instance. Click 'Fetch Instance' to start.";
+            if (data.error) {
+                showError(data.error);
+                return;
+            }
+            if (data.status === "not_found") {
+                setAlert("No active instance. Click 'Fetch Instance' to start.");
                 hideChallengeUpdate();
                 toggleChallengeCreate();
-            } else if (data.status == "running" || data.status == "provisioning") {
-                // Show connection info
-                let expires = document.createElement('span');
-                expires.textContent = formatExpiry(data.expires_at);
-                alert.append(expires, document.createElement('br'));
-
-                // Display connection info based on type
-                renderConnectionInfo(data.connection, alert);
+                return;
+            }
+            if (data.status === "running" || data.status === "provisioning") {
+                applyInstancePayload(data);
                 hideChallengeCreate();
                 toggleChallengeUpdate();
-            } else {
-                alert.innerHTML = data.error || "Unknown status";
-                alert.classList.add("alert-danger");
-                hideChallengeUpdate();
-                toggleChallengeCreate();
+                if (data.status === "provisioning") {
+                    scheduleProvisioningPoll(challenge_id);
+                }
+                return;
+            }
+            showError(data.error || ("Unknown status: " + data.status));
+        })
+        .catch(function (error) {
+            console.error("[Container] Fetch error:", error);
+            if (displayedChallengeId === challenge_id) {
+                showError("Error fetching container info.");
             }
         })
-        .catch(error => {
-            console.error("[Container] Fetch error:", error);
-            alert.innerHTML = "Error fetching container info.";
-            alert.classList.add("alert-danger");
-            toggleChallengeCreate();
-        })
-        .finally(enableButtons);
+        .finally(function () {
+            if (displayedChallengeId === challenge_id) enableButtons();
+        });
 }
 
 function container_request(challenge_id) {
-    let alert = resetAlert();
+    resetAlert();
 
     fetch("/api/v1/containers/request", {
         method: "POST",
@@ -178,35 +343,28 @@ function container_request(challenge_id) {
         },
         body: JSON.stringify({ challenge_id: challenge_id })
     })
-        .then(response => response.json())
-        .then(data => {
-            alert.innerHTML = ""; // Remove spinner
+        .then(function (response) { return response.json(); })
+        .then(function (data) {
             if (data.error) {
-                alert.innerHTML = data.error;
-                alert.classList.add("alert-danger");
-                toggleChallengeCreate();
-            } else {
-                // Show connection info
-                let expires = document.createElement('span');
-                expires.textContent = formatExpiry(data.expires_at);
-                alert.append(expires, document.createElement('br'));
-
-                // Display connection info based on type
-                renderConnectionInfo(data.connection, alert);
-                hideChallengeCreate();
-                toggleChallengeUpdate();
+                showError(data.error);
+                return;
+            }
+            applyInstancePayload(data);
+            hideChallengeCreate();
+            toggleChallengeUpdate();
+            if (data.status === "created" || data.status === "provisioning") {
+                scheduleProvisioningPoll(challenge_id);
             }
         })
-        .catch(error => {
+        .catch(function (error) {
             console.error("[Container] Request error:", error);
-            alert.innerHTML = "Error requesting container.";
-            alert.classList.add("alert-danger");
+            showError("Error requesting container.");
         })
         .finally(enableButtons);
 }
 
 function container_renew(challenge_id) {
-    let alert = resetAlert();
+    resetAlert();
 
     fetch("/api/v1/containers/renew", {
         method: "POST",
@@ -217,27 +375,38 @@ function container_renew(challenge_id) {
         },
         body: JSON.stringify({ challenge_id: challenge_id })
     })
-        .then(response => response.json())
-        .then(data => {
-            alert.innerHTML = ""; // Remove spinner
+        .then(function (response) { return response.json(); })
+        .then(function (data) {
             if (data.error) {
-                alert.innerHTML = data.error;
-                alert.classList.add("alert-danger");
-            } else {
-                // Fetch updated info
-                view_container_info(challenge_id);
+                showError(data.error);
+                return;
             }
+            view_container_info(challenge_id);
         })
-        .catch(error => {
-            alert.innerHTML = "Error renewing container.";
-            alert.classList.add("alert-danger");
-            console.error("Fetch error:", error);
+        .catch(function (error) {
+            console.error("[Container] Renew error:", error);
+            showError("Error renewing container.");
         })
         .finally(enableButtons);
 }
 
+function container_terminate(challenge_id) {
+    // Two-step inline confirmation: no browser confirm() dialog, and no
+    // dependency on the theme's bundled (non-global) Bootstrap Modal.
+    var button = el("terminate-chal");
+    if (!button) return;
+
+    if (button.dataset.confirming !== "1") {
+        beginTerminateConfirm(button);
+        return;
+    }
+
+    endTerminateConfirm(button);
+    container_stop(challenge_id);
+}
+
 function container_stop(challenge_id) {
-    let alert = resetAlert();
+    resetAlert();
 
     fetch("/api/v1/containers/stop", {
         method: "POST",
@@ -248,254 +417,57 @@ function container_stop(challenge_id) {
         },
         body: JSON.stringify({ challenge_id: challenge_id })
     })
-        .then(response => response.json())
-        .then(data => {
-            alert.innerHTML = ""; // Remove spinner
+        .then(function (response) { return response.json(); })
+        .then(function (data) {
             if (data.error) {
-                alert.innerHTML = data.error;
-                alert.classList.add("alert-danger");
-            } else {
-                alert.innerHTML = "Instance terminated successfully.";
-                hideChallengeUpdate();
-                toggleChallengeCreate();
+                showError(data.error);
+                return;
             }
+            setAlert("Instance terminated.");
+            hideChallengeUpdate();
+            toggleChallengeCreate();
         })
-        .catch(error => {
+        .catch(function (error) {
             console.error("[Container] Stop error:", error);
-            alert.innerHTML = "Error stopping container.";
-            alert.classList.add("alert-danger");
+            showError("Error stopping container.");
         })
         .finally(enableButtons);
 }
 
-// Initialize: Inject UI elements if template doesn't load
-(function () {
-    // console.log("[Container] Initializing - checking for template render");
+// CTFd's core-beta theme injects this script dynamically (see fetchScript in
+// its bundle) *after* DOMContentLoaded, so a DOMContentLoaded listener here
+// would never fire. Poll briefly for the panel the view template renders
+// instead; the template's own inline call also reaches this same function, and
+// a second call is harmless.
+(function initContainerPanel() {
+    var attempts = 0;
+    var maxAttempts = 25; // ~5s
 
-    let checkCount = 0;
-    const maxChecks = 20;
-
-    function checkAndInject() {
-        checkCount++;
-        // console.log(`[Container] Check #${checkCount}: Looking for deployment-actions or challenge window`);
-
-        // First check if our template loaded
-        let deploymentDiv = document.querySelector('.deployment-actions');
-        if (deploymentDiv) {
-            const challengeId = deploymentDiv.getAttribute('data-challenge-id');
-            if (challengeId) {
-                // console.log("[Container] Template loaded! Challenge ID:", challengeId);
-                view_container_info(parseInt(challengeId));
-                return true;
-            }
+    function findChallengeId() {
+        var panel = document.querySelector(".deployment-actions");
+        if (panel) {
+            var id = parseInt(panel.getAttribute("data-challenge-id"), 10);
+            if (!isNaN(id)) return id;
         }
-
-        // If template didn't load, inject UI manually
-        const challengeWindow = document.getElementById('challenge-window');
-        const challengeBody = challengeWindow ? challengeWindow.querySelector('.modal-body') : null;
-
-        if (challengeBody && !document.querySelector('.deployment-actions-injected')) {
-            // console.log("[Container] Template NOT loaded, injecting UI manually");
-
-            // Try multiple ways to get challenge ID
-            let challengeId = null;
-
-            // Method 1: From window.challenge
-            if (window.challenge?.data?.id) {
-                challengeId = window.challenge.data.id;
-                // console.log("[Container] Got challenge ID from window.challenge:", challengeId);
-            }
-
-            // Method 2: From CTFd internal store
-            if (!challengeId && window.CTFd?._internal?.challenge?.data?.id) {
-                challengeId = window.CTFd._internal.challenge.data.id;
-                // console.log("[Container] Got challenge ID from CTFd._internal:", challengeId);
-            }
-
-            // Method 3: From challenge-id input field
-            if (!challengeId) {
-                const challengeIdInput = document.getElementById('challenge-id');
-                if (challengeIdInput) {
-                    challengeId = parseInt(challengeIdInput.value);
-                    // console.log("[Container] Got challenge ID from input field:", challengeId);
-                }
-            }
-
-            // Method 4: From modal title or data attributes
-            if (!challengeId && challengeWindow) {
-                const titleElement = challengeWindow.querySelector('[data-challenge-id]');
-                if (titleElement) {
-                    challengeId = parseInt(titleElement.getAttribute('data-challenge-id'));
-                    // console.log("[Container] Got challenge ID from data attribute:", challengeId);
-                }
-            }
-
-            if (!challengeId) {
-                console.warn("[Container] Cannot get challenge ID, available data:", {
-                    'window.challenge': window.challenge,
-                    'CTFd._internal.challenge': window.CTFd?._internal?.challenge,
-                    'challenge-id input': document.getElementById('challenge-id')?.value
-                });
-                return false;
-            }
-
-            // console.log("[Container] Using challenge ID:", challengeId);
-
-            // Create container UI
-            const containerDiv = document.createElement('div');
-            containerDiv.className = 'mb-3 text-center deployment-actions-injected';
-            containerDiv.innerHTML = `
-                <div class="alert alert-primary" id="deployment-info">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                </div>
-                <span>
-                    <button onclick="container_request(${challengeId})" class="btn btn-primary d-none" id="create-chal">
-                        <small style="color: white"> Fetch Instance </small>
-                    </button>
-                    <button onclick="container_renew(${challengeId})" class="btn btn-info d-none" id="extend-chal">
-                        <small style="color: white"> Extend Time </small>
-                    </button>
-                    <button onclick="container_stop(${challengeId})" class="btn btn-danger d-none" id="terminate-chal">
-                        <small style="color: white"> Terminate </small>
-                    </button>
-                </span>
-            `;
-
-            // Insert after challenge description
-            const descSection = challengeBody.querySelector('.challenge-desc');
-            if (descSection) {
-                descSection.after(containerDiv);
-                // console.log("[Container] UI injected, calling view_container_info");
-                view_container_info(challengeId);
-                return true;
-            } else {
-                challengeBody.insertBefore(containerDiv, challengeBody.firstChild);
-                // console.log("[Container] UI injected at top, calling view_container_info");
-                view_container_info(challengeId);
-                return true;
-            }
+        var input = document.getElementById("challenge-id");
+        if (input && input.value) {
+            var fromInput = parseInt(input.value, 10);
+            if (!isNaN(fromInput)) return fromInput;
         }
-
-        if (checkCount >= maxChecks) {
-            console.error("[Container] Max checks reached, giving up");
-            return true; // Stop checking
-        }
-
-        return false;
+        return null;
     }
 
-    // Try immediately
-    if (checkAndInject()) return;
-
-    // Watch for changes
-    const observer = new MutationObserver(function (mutations) {
-        if (checkAndInject()) {
-            observer.disconnect();
+    function tryInit() {
+        attempts += 1;
+        var challengeId = findChallengeId();
+        if (challengeId !== null) {
+            view_container_info(challengeId);
+            return;
         }
-    });
+        if (attempts < maxAttempts) {
+            setTimeout(tryInit, 200);
+        }
+    }
 
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true
-    });
-
-    // console.log("[Container] MutationObserver started");
+    tryInit();
 })();
-
-function renderConnectionInfo(connection, parent) {
-    // Prioritize URL List (Multi-port Subdomain)
-    if (connection.type == "url_list" && connection.urls) {
-        connection.urls.forEach(function (item) {
-            let link = document.createElement('a');
-            link.href = item.url;
-            link.textContent = item.url;
-            link.target = '_blank';
-            parent.append(link, document.createElement('br'));
-        });
-        return; // Stop here if handled
-    }
-
-    if (connection.ports && Object.keys(connection.ports).length > 0) {
-        // Multi-port logic (Host:Port fallback)
-        if (connection.type == "tcp" || connection.type == "nc") {
-            let ports = Object.values(connection.ports).join(', ');
-            let code = document.createElement('code');
-            code.textContent = 'nc ' + connection.host + " " + ports;
-            parent.append(code);
-        } else if (connection.type == "http" || connection.type == "web") {
-            for (let internal in connection.ports) {
-                let external = connection.ports[internal];
-                let link = document.createElement('a');
-                link.href = 'http://' + connection.host + ":" + external;
-                link.textContent = 'http://' + connection.host + ":" + external;
-                link.target = '_blank';
-                parent.append(link, document.createElement('br'));
-            }
-        } else if (connection.type == "ssh") {
-            for (let internal in connection.ports) {
-                let external = connection.ports[internal];
-                let code = document.createElement('code');
-                code.textContent = 'ssh -p ' + external + ' user@' + connection.host;
-                parent.append(code, document.createElement('br'));
-            }
-        } else {
-            // Default/Custom
-            for (let internal in connection.ports) {
-                let external = connection.ports[internal];
-                let code = document.createElement('code');
-                code.textContent = connection.host + ":" + external;
-                parent.append(code, document.createElement('br'));
-            }
-        }
-    } else {
-        // Legacy single port
-        if (connection.type == "tcp" || connection.type == "nc") {
-            let codeElement = document.createElement('code');
-            codeElement.textContent = 'nc ' + connection.host + " " + connection.port;
-            parent.append(codeElement);
-        } else if (connection.type == "ssh") {
-            let codeElement = document.createElement('code');
-            codeElement.textContent = 'ssh -p ' + connection.port + ' user@' + connection.host;
-            parent.append(codeElement);
-        } else if (connection.type == "url") {
-            let link = document.createElement('a');
-            let url = connection.url || ('https://' + connection.host);
-            link.href = url;
-            link.textContent = url;
-            link.target = '_blank';
-            parent.append(link);
-        } else if (connection.type == "http" || connection.type == "web") {
-            let link = document.createElement('a');
-            link.href = 'http://' + connection.host + ":" + connection.port;
-            link.textContent = 'http://' + connection.host + ":" + connection.port;
-            link.target = '_blank';
-            parent.append(link);
-        } else if (connection.type == "https") {
-            let link = document.createElement('a');
-            link.href = 'https://' + connection.host;
-            link.textContent = 'https://' + connection.host;
-            link.target = '_blank';
-            parent.append(link);
-        } else if (connection.type == "url_list") {
-            // Redundant fallback (should be handled above), but kept for safety if .urls is empty
-            // Just show generic host
-            let codeElement = document.createElement('code');
-            codeElement.textContent = connection.host;
-            parent.append(codeElement);
-        } else {
-            let codeElement = document.createElement('code');
-            codeElement.textContent = connection.host + ":" + connection.port;
-            parent.append(codeElement);
-        }
-    }
-
-    // Append info text if available
-    if (connection.info) {
-        if (parent.lastChild.tagName != 'BR') parent.append(document.createElement('br'));
-        let info = document.createElement('small');
-        info.textContent = connection.info;
-        parent.append(info);
-    }
-}

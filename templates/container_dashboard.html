@@ -96,6 +96,30 @@
 		overflow: hidden;
 		white-space: nowrap;
 	}
+
+	/* inline confirmation popover (replaces window.confirm) */
+	.containers-confirm {
+		position: absolute;
+		z-index: 1080;
+		max-width: 320px;
+		background: #fff;
+		color: #212529;
+		border: 1px solid #dee2e6;
+		border-radius: 6px;
+		box-shadow: 0 6px 24px rgba(0, 0, 0, .18);
+		padding: 12px 14px;
+	}
+
+	.containers-confirm-text {
+		margin-bottom: 10px;
+		font-size: .95rem;
+	}
+
+	.containers-confirm-actions {
+		display: flex;
+		gap: 8px;
+		justify-content: flex-end;
+	}
 </style>
 
 <div class="filter-card mb-4">
@@ -432,51 +456,136 @@
 		location.reload();
 	}, 15000);
 
+	/*
+	 * Inline confirmation popover. The theme bundles Bootstrap's JS inside a
+	 * module, so `bootstrap.Modal` is not reachable from a plugin; this is a
+	 * small self-contained replacement for window.confirm().
+	 */
+	const CONTAINERS = (function () {
+		let popover = null;
+		let pending = null;
+
+		function close() {
+			if (popover && popover.parentNode) popover.parentNode.removeChild(popover);
+			popover = null;
+			pending = null;
+			document.removeEventListener('click', onOutsideClick, true);
+			document.removeEventListener('keydown', onKeydown, true);
+		}
+
+		function onOutsideClick(event) {
+			if (popover && !popover.contains(event.target)) close();
+		}
+
+		function onKeydown(event) {
+			if (event.key === 'Escape') close();
+		}
+
+		function confirmAction(message, onConfirm) {
+			close();
+
+			popover = document.createElement('div');
+			popover.className = 'containers-confirm';
+
+			const text = document.createElement('div');
+			text.className = 'containers-confirm-text';
+			text.textContent = message;
+
+			const actions = document.createElement('div');
+			actions.className = 'containers-confirm-actions';
+
+			const cancel = document.createElement('button');
+			cancel.type = 'button';
+			cancel.className = 'btn btn-sm btn-outline-secondary';
+			cancel.textContent = 'Cancel';
+			cancel.addEventListener('click', close);
+
+			const ok = document.createElement('button');
+			ok.type = 'button';
+			ok.className = 'btn btn-sm btn-danger';
+			ok.textContent = 'Confirm';
+			ok.addEventListener('click', function () {
+				const action = pending;
+				close();
+				if (action) action();
+			});
+
+			actions.append(cancel, ok);
+			popover.append(text, actions);
+
+			// anchor near the control the admin clicked, if we know it
+			const anchor = window.event && window.event.target;
+			document.body.appendChild(popover);
+			const rect = popover.getBoundingClientRect();
+			let top = window.scrollY + 80;
+			let left = window.scrollX + Math.max(12, (window.innerWidth - rect.width) / 2);
+			if (anchor && anchor.getBoundingClientRect) {
+				const a = anchor.getBoundingClientRect();
+				top = window.scrollY + a.bottom + 8;
+				left = window.scrollX + Math.min(
+					Math.max(12, a.left), window.innerWidth - rect.width - 12);
+			}
+			popover.style.top = top + 'px';
+			popover.style.left = left + 'px';
+
+			pending = onConfirm;
+			setTimeout(function () {
+				document.addEventListener('click', onOutsideClick, true);
+				document.addEventListener('keydown', onKeydown, true);
+			}, 0);
+		}
+
+		return { confirm: confirmAction, close: close };
+	})();
+
 	function deleteInstance(instanceId) {
-		if (!confirm('Are you sure you want to terminate and delete this container?')) return;
-		fetch('{{ url_for("containers_admin.api_instances") }}/' + instanceId, {
-			method: 'DELETE',
-			headers: { 'Content-Type': 'application/json', 'CSRF-Token': init.csrfNonce }
-		}).then(r => r.json()).then(data => {
-			if (data.success) location.reload();
-			else alert('Error: ' + data.error);
+		CONTAINERS.confirm('Terminate and delete this container?', function () {
+			fetch('{{ url_for("containers_admin.api_instances") }}/' + instanceId, {
+				method: 'DELETE',
+				headers: { 'Content-Type': 'application/json', 'CSRF-Token': init.csrfNonce }
+			}).then(r => r.json()).then(data => {
+				if (data.success) location.reload();
+				else alert('Error: ' + data.error);
+			});
 		});
 	}
 
 	function bulkDeleteContainers() {
 		let selected = Array.from(document.querySelectorAll(".container-checkbox:checked")).map(cb => cb.value);
 		if (selected.length === 0) return alert("Select at least one container.");
-		if (!confirm(`Delete ${selected.length} items?`)) return;
-
-		fetch('{{ url_for("containers_admin.api_bulk_delete") }}', {
-			method: "POST",
-			headers: { "Content-Type": "application/json", "CSRF-Token": init.csrfNonce },
-			body: JSON.stringify({ instance_ids: selected }),
-		}).then(r => r.json()).then(data => {
-			if (data.success) location.reload();
-			else alert("Error: " + data.error);
+		CONTAINERS.confirm(`Delete ${selected.length} container(s)?`, function () {
+			fetch('{{ url_for("containers_admin.api_bulk_delete") }}', {
+				method: "POST",
+				headers: { "Content-Type": "application/json", "CSRF-Token": init.csrfNonce },
+				body: JSON.stringify({ instance_ids: selected }),
+			}).then(r => r.json()).then(data => {
+				if (data.success) location.reload();
+				else alert("Error: " + data.error);
+			});
 		});
 	}
 
 	function emergencyStop() {
-		if (!confirm('EMERGENCY: Stop ALL containers?')) return;
-		fetch('{{ url_for("containers_admin.api_emergency_stop") }}', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json', 'CSRF-Token': init.csrfNonce }
-		}).then(r => r.json()).then(data => {
-			if (data.success) { alert('Stopped ' + data.stopped); location.reload(); }
-			else alert('Error: ' + data.error);
+		CONTAINERS.confirm('Stop ALL running containers?', function () {
+			fetch('{{ url_for("containers_admin.api_emergency_stop") }}', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json', 'CSRF-Token': init.csrfNonce }
+			}).then(r => r.json()).then(data => {
+				if (data.success) { alert('Stopped ' + data.stopped); location.reload(); }
+				else alert('Error: ' + data.error);
+			});
 		});
 	}
 
 	function cleanupSolved() {
-		if (!confirm('Cleanup solved containers?')) return;
-		fetch('{{ url_for("containers_admin.api_cleanup_solved") }}', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json', 'CSRF-Token': init.csrfNonce }
-		}).then(r => r.json()).then(data => {
-			if (data.success) { alert('Cleaned ' + data.deleted); location.reload(); }
-			else alert('Error: ' + data.error);
+		CONTAINERS.confirm('Delete all solved containers?', function () {
+			fetch('{{ url_for("containers_admin.api_cleanup_solved") }}', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json', 'CSRF-Token': init.csrfNonce }
+			}).then(r => r.json()).then(data => {
+				if (data.success) { alert('Cleaned ' + data.deleted); location.reload(); }
+				else alert('Error: ' + data.error);
+			});
 		});
 	}
 </script>

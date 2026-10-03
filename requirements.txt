@@ -1,5 +1,19 @@
-docker
-paramiko
-apscheduler
-cryptography
-openpyxl
+# Dependencies imported by the containers plugin.
+#
+# IMPORTANT: CTFd installs these automatically only while the *image is built*
+# (see the `for d in CTFd/plugins/*; do pip install -r ...; done` loop in
+# CTFd's Dockerfile). Bind-mounting the plugin at run time installs nothing, so
+# bake them in with `docker compose up --build`, or run pip inside the running
+# container once.
+#
+# `cryptography` and `requests` are intentionally NOT listed: CTFd already ships
+# both (cryptography==40.0.2, requests==2.32.3) and re-resolving them here lets
+# pip pull a newer cffi, which breaks CTFd's pinned `pybluemonday` (`cffi~=1.1`).
+# The plugin only needs `cryptography.fernet.Fernet` and `requests.post`, both
+# of which are stable API.
+#
+# Upper bounds are deliberate: a new major release must be tested first.
+docker>=6.1,<8
+paramiko>=3.4,<5
+apscheduler>=3.10,<4
+openpyxl>=3.1,<4

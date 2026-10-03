@@ -1,136 +1,158 @@
-import requests
+"""
+Notification Service - Discord webhook alerts (optional)
+"""
 import logging
-from CTFd.models import db
+
+import requests
+
 from ..models.config import ContainerConfig
 
 logger = logging.getLogger(__name__)
 
+REQUEST_TIMEOUT = 5
+
+DEMO_COLORS = {
+    'info': 0x3498db,
+    'success': 0x00ff00,
+    'warning': 0xffa500,
+    'error': 0xff0000,
+}
+
+
 class NotificationService:
+    """Thin Discord webhook client. Every method degrades to a no-op."""
+
     def __init__(self):
-        self.webhook_url = None
+        pass
 
+    # ------------------------------------------------------------------
+    # Configuration
+    # ------------------------------------------------------------------
     def _get_webhook_url(self):
-        return ContainerConfig.get('container_discord_webhook_url', '')
+        return (ContainerConfig.get('container_discord_webhook_url', '') or '').strip()
 
-    def send_alert(self, title, message, color=0xff0000, fields=None):
-        """
-        Send an alert to Discord
-        
-        Args:
-            title: Embed title
-            message: Embed description
-            color: Hex color integer (default red)
-            fields: List of dicts {'name': str, 'value': str, 'inline': bool}
-        """
-        webhook_url = self._get_webhook_url()
+    @staticmethod
+    def _valid_webhook(url: str) -> bool:
+        return bool(url) and url.startswith((
+            'https://discord.com/api/webhooks/',
+            'https://discordapp.com/api/webhooks/',
+            'https://canary.discord.com/api/webhooks/',
+        ))
+
+    # ------------------------------------------------------------------
+    # Sending
+    # ------------------------------------------------------------------
+    def send_alert(self, title, message, color=0xff0000, fields=None, url=None):
+        """Send an alert to the configured Discord webhook."""
+        webhook_url = (url or self._get_webhook_url() or '').strip()
         if not webhook_url:
             return False
+        return self._send_raw(webhook_url, title, message, color, fields)
 
+    def _send_raw(self, url, title, message, color, fields=None):
+        if not url:
+            return False
+        payload = {
+            "embeds": [{
+                "title": str(title)[:256],
+                "description": str(message)[:4000],
+                "color": color,
+                "fields": (fields or [])[:25],
+            }]
+        }
         try:
-            payload = {
-                "embeds": [{
-                    "title": title,
-                    "description": message,
-                    "color": color,
-                    "fields": fields or []
-                }]
-            }
-            
-            response = requests.post(webhook_url, json=payload, timeout=5)
-            return response.status_code == 204
-        except Exception as e:
+            response = requests.post(url, json=payload, timeout=REQUEST_TIMEOUT)
+            if response.status_code not in (200, 204):
+                logger.warning(
+                    "Discord webhook returned %s: %s",
+                    response.status_code, response.text[:200],
+                )
+                return False
+            return True
+        except Exception as e:  # noqa: BLE001
             logger.error(f"Failed to send Discord notification: {e}")
             return False
 
-    def notify_cheat(self, user, challenge, flag, owner):
-        """Send cheat detection alert"""
+    # ------------------------------------------------------------------
+    # High level alerts
+    # ------------------------------------------------------------------
+    def notify_flag_reuse(self, challenge, submitter_account_id, owner_account_id,
+                          flag=None, banned=False):
+        """Alert admins that a flag was submitted by a different account."""
         fields = [
-            {"name": "User", "value": user.name if user else "Unknown", "inline": True},
-            {"name": "Challenge", "value": challenge.name if challenge else "Unknown", "inline": True},
-            {"name": "Flag Submitted", "value": f"`{flag}`", "inline": False},
-            {"name": "Original Owner", "value": owner.name if owner else "Unknown", "inline": True},
-            {"name": "Action Taken", "value": "User & Owner Banned", "inline": False}
+            {"name": "Challenge", "value": str(getattr(challenge, 'name', 'unknown')), "inline": True},
+            {"name": "Submitted by account", "value": str(submitter_account_id), "inline": True},
+            {"name": "Flag owner account", "value": str(owner_account_id), "inline": True},
+            {"name": "Action taken", "value": "Accounts banned" if banned else "Logged only",
+             "inline": False},
         ]
-        
+        if flag:
+            fields.insert(3, {"name": "Flag", "value": f"||`{str(flag)[:80]}`||", "inline": False})
+
         return self.send_alert(
-            title="🚨 Cheating Detected!",
-            message="A user submitted a flag belonging to another team/user.",
-            color=0xff0000, # Red
-            fields=fields
+            title="🚨 Flag sharing detected",
+            message="A player submitted a flag that belongs to another team/user.",
+            color=DEMO_COLORS['error'],
+            fields=fields,
+        )
+
+    # Backwards compatible alias
+    def notify_cheat(self, user=None, challenge=None, flag=None, owner=None):
+        return self.notify_flag_reuse(
+            challenge=challenge,
+            submitter_account_id=getattr(user, 'id', 'unknown') if user else 'unknown',
+            owner_account_id=getattr(owner, 'id', 'unknown') if owner else 'unknown',
+            flag=flag,
         )
 
     def notify_error(self, operation, error_msg):
-        """Send system error alert"""
+        """Send a system error alert"""
         fields = [
-            {"name": "Operation", "value": operation, "inline": True},
-            {"name": "Error", "value": f"```{error_msg}```", "inline": False}
+            {"name": "Operation", "value": str(operation), "inline": True},
+            {"name": "Error", "value": f"```{str(error_msg)[:900]}```", "inline": False},
         ]
-        
         return self.send_alert(
+            title="⚠️ Container system error",
             message="An error occurred in the container system.",
-            color=0xffa500, # Orange
-            fields=fields
+            color=DEMO_COLORS['warning'],
+            fields=fields,
         )
 
+    # ------------------------------------------------------------------
+    # Admin "test webhook" helpers
+    # ------------------------------------------------------------------
     def send_test(self, webhook_url=None):
-        """Send a simple test message"""
-        url_to_use = webhook_url or self._get_webhook_url()
-        return self._send_raw(
-            url_to_use,
-            title="✅ Connection Test",
-            message="Your Discord Webhook is configured correctly!",
-            color=0x00ff00 # Green
+        return self.send_alert(
+            title="✅ Connection test",
+            message="Your Discord webhook is configured correctly!",
+            color=DEMO_COLORS['success'],
+            url=webhook_url,
         )
 
     def send_demo_cheat(self, webhook_url=None):
-        """Send a demo cheat alert"""
-        url_to_use = webhook_url or self._get_webhook_url()
         fields = [
-            {"name": "User", "value": "demo_hacker", "inline": True},
             {"name": "Challenge", "value": "Demo Challenge", "inline": True},
-            {"name": "Flag Submitted", "value": "`CTF{demo_flag_hash}`", "inline": False},
-            {"name": "Original Owner", "value": "innocent_victim", "inline": True},
-            {"name": "Action Taken", "value": "User & Owner Banned", "inline": False}
+            {"name": "Submitted by account", "value": "42", "inline": True},
+            {"name": "Flag owner account", "value": "7", "inline": True},
+            {"name": "Action taken", "value": "Logged only (demo)", "inline": False},
         ]
-        return self._send_raw(
-            url_to_use,
-            title="🚨 Cheating Detected! (DEMO)",
-            message="This is a DEMO alert. No actual banning occurred.",
-            color=0xff0000, # Red
-            fields=fields
+        return self.send_alert(
+            title="🚨 Flag sharing detected (DEMO)",
+            message="This is a demo alert. No account was affected.",
+            color=DEMO_COLORS['error'],
+            fields=fields,
+            url=webhook_url,
         )
 
     def send_demo_error(self, webhook_url=None):
-        """Send a demo error alert"""
-        url_to_use = webhook_url or self._get_webhook_url()
         fields = [
             {"name": "Operation", "value": "Container Provisioning", "inline": True},
-            {"name": "Error", "value": "```DockerException: Connection refused```", "inline": False}
+            {"name": "Error", "value": "```DockerException: Connection refused```", "inline": False},
         ]
-        return self._send_raw(
-            url_to_use,
-            title="⚠️ Plugin Error (DEMO)",
-            message="This is a DEMO alert.",
-            color=0xffa500, # Orange
-            fields=fields
+        return self.send_alert(
+            title="⚠️ Container system error (DEMO)",
+            message="This is a demo alert.",
+            color=DEMO_COLORS['warning'],
+            fields=fields,
+            url=webhook_url,
         )
-
-    def _send_raw(self, url, title, message, color, fields=None):
-        """Internal method to send to a specific URL"""
-        if not url:
-            return False
-        
-        try:
-            payload = {
-                "embeds": [{
-                    "title": title,
-                    "description": message,
-                    "color": color,
-                    "fields": fields or []
-                }]
-            }
-            response = requests.post(url, json=payload, timeout=5)
-            return response.status_code == 204
-        except Exception as e:
-            logger.error(f"Failed to send Discord notification: {e}")
-            return False

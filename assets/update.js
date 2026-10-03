@@ -10,36 +10,50 @@ CTFd.plugin.run((_CTFd) => {
 });
 
 // Parse flag pattern and auto-fill hidden fields
+function renderFlagPreview(preview, label, code, color) {
+    // textContent (not innerHTML): the pattern is admin supplied input and
+    // must never be interpreted as markup.
+    preview.textContent = '';
+    preview.append(label);
+    const codeEl = document.createElement('code');
+    codeEl.textContent = code;
+    preview.appendChild(codeEl);
+    preview.style.color = color;
+}
+
 function parseFlagPattern() {
-    const pattern = document.getElementById('flag_pattern').value;
+    const input = document.getElementById('flag_pattern');
     const preview = document.getElementById('flag_pattern_preview');
-    
+    if (!input || !preview) return;
+
+    const pattern = input.value;
+
     // Check for random pattern: <ran_N> where N is the length
     const randomMatch = pattern.match(/<ran_(\d+)>/);
-    
+
     if (randomMatch) {
-        // Random mode detected
-        const randomLength = parseInt(randomMatch[1]);
+        const randomLength = parseInt(randomMatch[1], 10);
         const parts = pattern.split(randomMatch[0]);
-        
+
         document.getElementById('flag_mode').value = 'random';
         document.getElementById('flag_prefix').value = parts[0] || '';
         document.getElementById('flag_suffix').value = parts[1] || '';
         document.getElementById('random_flag_length').value = randomLength;
-        
-        // Generate preview
+
         const exampleRandom = 'x'.repeat(randomLength);
-        preview.innerHTML = `✓ Random mode: <code>${parts[0]}${exampleRandom}${parts[1]}</code> (${randomLength} random chars)`;
-        preview.style.color = '#17a2b8';
+        renderFlagPreview(
+            preview,
+            `\u2713 Random mode: `,
+            `${parts[0] || ''}${exampleRandom}${parts[1] || ''} (${randomLength} random chars)`,
+            '#17a2b8'
+        );
     } else {
-        // Static mode
         document.getElementById('flag_mode').value = 'static';
         document.getElementById('flag_prefix').value = pattern;
         document.getElementById('flag_suffix').value = '';
         document.getElementById('random_flag_length').value = 0;
-        
-        preview.innerHTML = `✓ Static mode: <code>${pattern}</code> (same for all teams)`;
-        preview.style.color = '#28a745';
+
+        renderFlagPreview(preview, `\u2713 Static mode: `, `${pattern} (same for all teams)`, '#28a745');
     }
 }
 
@@ -112,16 +126,16 @@ fetch("/admin/containers/api/images", {
 .then(response => response.json())
 .then(data => {
     if (data.error) {
-        containerImageDefault.innerHTML = data.error;
+        containerImageDefault.textContent = data.error;
     } else {
         for (var i = 0; i < data.images.length; i++) {
             var opt = document.createElement("option");
             opt.value = data.images[i];
-            opt.innerHTML = data.images[i];
+            opt.textContent = data.images[i];
             containerImage.appendChild(opt);
         }
         containerImageDefault.innerHTML = "Choose an image...";
-        containerImage.removeAttribute("disabled");
+        containerImage.disabled = false;
         
         // Set selected image from challenge data
         if (typeof container_image_selected !== 'undefined') {
@@ -131,7 +145,7 @@ fetch("/admin/containers/api/images", {
 })
 .catch(error => {
     console.error("Error loading images:", error);
-    containerImageDefault.innerHTML = "Error loading images";
+    containerImageDefault.textContent = "Error loading images";
 });
 
 // Set connection type value from challenge data

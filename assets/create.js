@@ -52,9 +52,16 @@ CTFd.plugin.run((_CTFd) => {
             document.getElementById('flag_suffix').value = parts[1] || '';
             document.getElementById('random_flag_length').value = randomLength;
             
-            // Generate preview
+            // Generate preview. Use textContent for the user supplied pattern:
+            // an admin (or anyone who can reach this form) could otherwise
+            // store markup that runs in every other admin's session.
             const exampleRandom = 'x'.repeat(randomLength);
-            preview.innerHTML = `✓ Random mode: <code>${parts[0]}${exampleRandom}${parts[1]}</code> (${randomLength} random chars)`;
+            preview.textContent = '';
+            preview.append('\u2713 Random mode: ');
+            const codeEl = document.createElement('code');
+            codeEl.textContent = `${parts[0]}${exampleRandom}${parts[1]}`;
+            preview.appendChild(codeEl);
+            preview.append(` (${randomLength} random chars)`);
             preview.style.color = '#17a2b8';
         } else {
             // Static mode
@@ -62,8 +69,13 @@ CTFd.plugin.run((_CTFd) => {
             document.getElementById('flag_prefix').value = pattern;
             document.getElementById('flag_suffix').value = '';
             document.getElementById('random_flag_length').value = 0;
-            
-            preview.innerHTML = `✓ Static mode: <code>${pattern}</code> (same for all teams)`;
+
+            preview.textContent = '';
+            preview.append('\u2713 Static mode: ');
+            const codeEl = document.createElement('code');
+            codeEl.textContent = pattern;
+            preview.appendChild(codeEl);
+            preview.append(' (same for all teams)');
             preview.style.color = '#28a745';
         }
     }
@@ -195,22 +207,22 @@ CTFd.plugin.run((_CTFd) => {
         })
         .then(data => {
             if (data.error) {
-                containerImageDefault.innerHTML = data.error;
+                containerImageDefault.textContent = data.error;
             } else {
                 for (var i = 0; i < data.images.length; i++) {
                     var opt = document.createElement("option");
                     opt.value = data.images[i];
-                    opt.innerHTML = data.images[i];
+                    opt.textContent = data.images[i];
                     containerImage.appendChild(opt);
                 }
-                containerImageDefault.innerHTML = "Choose an image...";
-                containerImage.removeAttribute("disabled");
+                containerImageDefault.textContent = "Choose an image...";
+                containerImage.disabled = false;
                 // console.log(('[Container Plugin] Loaded', data.images.length, 'Docker images');
             }
         })
         .catch(error => {
             console.error("[Container Plugin] Error loading images:", error);
-            containerImageDefault.innerHTML = "Error loading images";
+            containerImageDefault.textContent = "Error loading images";
         });
     } else {
         console.warn('[Container Plugin] Container image elements not found');

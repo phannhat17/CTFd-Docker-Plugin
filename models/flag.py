@@ -43,7 +43,7 @@ class ContainerFlag(db.Model):
     
     # Submission tracking
     submitted_at = db.Column(db.DateTime)
-    submitted_by_user_id = db.Column(db.Integer)  # User thực tế submit
+    submitted_by_user_id = db.Column(db.Integer)  # The user who actually submitted
     submitted_from_ip = db.Column(db.String(45))
     
     # Timestamps

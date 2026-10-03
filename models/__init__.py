@@ -1,7 +1,7 @@
 """
 Container Challenge Plugin - Database Models
 
-Chứa tất cả models cho plugin container challenge
+All models for the container challenge plugin
 """
 
 from .challenge import ContainerChallenge

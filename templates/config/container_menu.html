@@ -1,5 +1,8 @@
 <li class="nav-item">
-	<a class="nav-link {% if active_page == 'dashboard' %}active{% endif %}" href="{{ url_for('containers_admin.dashboard') }}"><i class="fas fa-list"></i> Instances</a>
+	<a class="nav-link {% if active_page == 'console' %}active{% endif %}" href="{{ url_for('containers_admin.console') }}"><i class="fas fa-columns"></i> Console (new UI)</a>
+</li>
+<li class="nav-item">
+	<a class="nav-link {% if active_page == 'dashboard' %}active{% endif %}" href="{{ url_for('containers_admin.dashboard') }}"><i class="fas fa-list"></i> Instances (classic)</a>
 </li>
 <li class="nav-item">
 	<a class="nav-link {% if active_page == 'settings' %}active{% endif %}" href="{{ url_for('containers_admin.settings') }}"><i class="fas fa-cog"></i> Settings</a>

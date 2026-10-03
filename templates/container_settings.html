@@ -207,6 +207,58 @@
 					Float value, e.g., 1.5 means 1.5 cores maximum
 				</small>
 			</div>
+
+			<div class="form-group">
+				<label for="renew_extension_minutes">Renewal Extension (minutes)</label>
+				<input class="form-control" type="number" name="renew_extension_minutes"
+					id="renew_extension_minutes" placeholder="5" value="{{ settings.renew_extension_minutes }}">
+				<small class="form-text text-muted">
+					How much time each "Extend" click adds to the current expiry
+				</small>
+			</div>
+		</div>
+	</div>
+
+	<div class="card mt-3">
+		<div class="card-header">
+			<h5><i class="fas fa-user-secret"></i> Anti-Cheat &amp; Retention</h5>
+		</div>
+		<div class="card-body">
+			<div class="form-group">
+				<label for="anticheat_autoban_threshold">Auto-ban Threshold (flag reuse detections)</label>
+				<input class="form-control" type="number" name="anticheat_autoban_threshold"
+					id="anticheat_autoban_threshold" placeholder="0"
+					value="{{ settings.anticheat_autoban_threshold }}">
+				<small class="form-text text-muted">
+					<strong>0 = never auto-ban (recommended).</strong>
+					Any value above 0 bans both the submitter and the flag owner after that many reuse
+					detections on the same challenge. Submitting somebody else's flag is trivial, so
+					auto-banning has to be an explicit decision.
+				</small>
+			</div>
+
+			<div class="form-group">
+				<div class="form-check">
+					<input class="form-check-input" type="checkbox" name="anticheat_log_all_attempts"
+						id="anticheat_log_all_attempts" value="true"
+						{{ 'checked' if settings.anticheat_log_all_attempts != 'false' else '' }}>
+					<label class="form-check-label" for="anticheat_log_all_attempts">
+						Log every flag submission attempt
+					</label>
+				</div>
+				<small class="form-text text-muted">
+					Disable on very large events to reduce database writes.
+				</small>
+			</div>
+
+			<div class="form-group">
+				<label for="audit_retention_days">Audit Retention (days)</label>
+				<input class="form-control" type="number" name="audit_retention_days" id="audit_retention_days"
+					placeholder="7" value="{{ settings.audit_retention_days }}">
+				<small class="form-text text-muted">
+					How long stopped/solved/errored instances are kept before the cleanup job deletes them
+				</small>
+			</div>
 		</div>
 	</div>
 
@@ -233,11 +285,22 @@
 					</small>
 				</div>
 			</div>
+
+			<div class="form-group">
+				<label for="port_bind_ip">Bind Challenge Ports To (optional)</label>
+				<input class="form-control" type="text" name="port_bind_ip" id="port_bind_ip"
+					placeholder="leave empty for 0.0.0.0" value="{{ settings.port_bind_ip }}">
+				<small class="form-text text-muted">
+					Publish challenge ports on a single interface instead of every interface.
+					Set this to your public IP / challenge-only IP when the CTFd host itself
+					must not be reachable on the challenge port range.
+				</small>
+			</div>
 			<div class="alert alert-warning">
 				<i class="fas fa-exclamation-triangle"></i> <strong>Note:</strong>
 				Make sure these ports are open in your firewall and not used by other services.
 				Port range: {{ settings.port_range_start }} - {{ settings.port_range_end }}
-				(Total: {{ (settings.port_range_end|int - settings.port_range_start|int) }} ports available)
+				(Total: {{ (settings.port_range_end|int - settings.port_range_start|int) + 1 }} ports available)
 			</div>
 		</div>
 	</div>
@@ -288,6 +351,27 @@
 					<small class="form-text text-muted">
 						Docker network where Traefik can reach challenge containers.
 					</small>
+				</div>
+
+				<div class="form-row">
+					<div class="form-group col-md-6">
+						<label for="subdomain_entrypoint">Traefik Entrypoint</label>
+						<input class="form-control" type="text" name="subdomain_entrypoint" id="subdomain_entrypoint"
+							placeholder="web" value="{{ settings.subdomain_entrypoint or 'web' }}">
+						<small class="form-text text-muted">
+							Entrypoint name Traefik routes the challenge subdomains on.
+						</small>
+					</div>
+					<div class="form-group col-md-6">
+						<label>Use TLS</label>
+						<div class="form-check mt-2">
+							<input class="form-check-input" type="checkbox" name="subdomain_tls" id="subdomain_tls"
+								value="true" {{ 'checked' if settings.subdomain_tls == 'true' else '' }}>
+							<label class="form-check-label" for="subdomain_tls">
+								Add the <code>tls=true</code> router label and show <code>https://</code> links
+							</label>
+						</div>
+					</div>
 				</div>
 
 				<div class="alert alert-warning">
@@ -352,10 +436,12 @@
 		e.preventDefault();
 		const formData = new FormData(this);
 
-		// Fix: Checkboxes are not included if unchecked, so we manually add them
-		if (!document.getElementById('subdomain_enabled').checked) {
-			formData.append('subdomain_enabled', 'false');
-		}
+		// Checkboxes are omitted when unchecked, so send explicit values
+		['subdomain_enabled', 'subdomain_tls', 'anticheat_log_all_attempts'].forEach(function (name) {
+			if (!formData.has(name)) {
+				formData.append(name, 'false');
+			}
+		});
 
 		const data = Object.fromEntries(formData);
 
@@ -369,11 +455,16 @@
 		})
 			.then(r => r.json())
 			.then(data => {
-				if (data.success) {
-					alert('Settings saved successfully');
+				const problems = (data.errors || []).filter(Boolean);
+				if (data.success !== false) {
+					if (problems.length) {
+						alert('Settings saved, with notes:\n- ' + problems.join('\n- '));
+					} else {
+						alert('Settings saved successfully');
+					}
 					location.reload();
 				} else {
-					alert('Error: ' + (data.error || 'Unknown error'));
+					alert('Error:\n- ' + (problems.join('\n- ') || data.error || 'Unknown error'));
 				}
 			})
 			.catch(e => alert('Network error: ' + e));
