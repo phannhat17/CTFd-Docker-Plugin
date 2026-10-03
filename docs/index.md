@@ -52,6 +52,7 @@ A CTFd plugin that gives every team (or every user, depending on the CTF mode) i
 | [Operations](operations.md) | Background jobs, expiry, retention, recovery |
 | [Security](security.md) | Isolation model and its limits |
 | [Troubleshooting](troubleshooting.md) | Common errors and fixes |
+| [Compared with other projects](comparison.md) | whale, CTFd-owl, rCTF, kCTF, redpwn/jail |
 | [Changelog](changelog.md) | What changed and why |
 
 ## Security warning

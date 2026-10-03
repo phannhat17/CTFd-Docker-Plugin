@@ -30,6 +30,7 @@ export default defineConfig({
       { text: 'Guide', link: '/installation', activeMatch: '^/(installation|configuration|challenges|player-guide)' },
       { text: 'Admin', link: '/admin-console', activeMatch: '^/(admin-console|anti-cheat|import)' },
       { text: 'Operations', link: '/operations', activeMatch: '^/(operations|security|troubleshooting)' },
+      { text: 'Compare', link: '/comparison', activeMatch: '^/comparison' },
       { text: 'Changelog', link: '/changelog' },
     ],
 
@@ -65,6 +66,10 @@ export default defineConfig({
           { text: 'Security', link: '/security' },
           { text: 'Troubleshooting', link: '/troubleshooting' },
         ],
+      },
+      {
+        text: 'Choosing a plugin',
+        items: [{ text: 'Compared with other projects', link: '/comparison' }],
       },
       {
         text: 'Project',
