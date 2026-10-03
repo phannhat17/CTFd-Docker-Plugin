@@ -29,23 +29,7 @@ A CTFd plugin that gives every team (or every user) their own Docker container f
 4. Open **Admin, Containers, Console**, then **Settings**, and set **Connection hostname** to an address your players can reach. It must not be the CTFd hostname.
 5. Create a challenge of type **container**, then click **Fetch Instance** on it to verify.
 
-Full instructions are in [docs/installation.md](docs/installation.md).
-
-## Documentation
-
-| Document | What it covers |
-| --- | --- |
-| [Installation](docs/installation.md) | Requirements, Docker setup, dependencies, first run |
-| [Configuration](docs/configuration.md) | Every setting and what it changes |
-| [Creating challenges](docs/challenges.md) | Images, ports, flags, scoring, limits |
-| [Player guide](docs/player-guide.md) | What a player sees and can do |
-| [Admin console](docs/admin-console.md) | The console, tab by tab |
-| [Anti-cheat](docs/anti-cheat.md) | Flag reuse detection, the two outcomes, auto-ban |
-| [Import](docs/import.md) | CSV and Excel bulk import |
-| [Operations](docs/operations.md) | Background jobs, expiry, retention, recovery |
-| [Security](docs/security.md) | Isolation model and its limits |
-| [Troubleshooting](docs/troubleshooting.md) | Common errors and fixes |
-| [Changelog](docs/changelog.md) | What changed and why |
+Full instructions are in [this link](https://ctfd-docker-plugin.phannhat.com/).
 
 ## Security warning
 
