@@ -49,7 +49,7 @@ A review pass over the whole plugin. Most of this release fixes things that were
 
 - The expiry sweep crashed when it ran outside a request context. Every scheduled run raised, so expired containers stayed alive and their instances were marked `error`.
 - The cleanup job used `signal.alarm`, which only works on the main thread, so it failed in every worker.
-- Released ports were never actually released. The lock key was left to expire on its own, so reuse was unreliable.
+- `release_port` never deleted the lock key, so a released port stayed reserved until its TTL ran out and reuse was unreliable.
 - CSV import did not work. The endpoint only accepted Excel while the UI, the README and the sample file were all CSV.
 - Deleting a challenge left its containers running, with no row left to manage them.
 - A 409 conflict from the Docker daemon, which happens when `auto_remove` removes a container before the plugin does, surfaced as an `ObjectDeletedError` and marked the instance `error`.

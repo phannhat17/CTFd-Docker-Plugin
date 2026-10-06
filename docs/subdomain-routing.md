@@ -5,7 +5,7 @@ description: "Serving web challenges through Traefik on a random subdomain."
 
 # Subdomain Routing Guide for CTFd Containers Plugin
 
-## 1. Architecture Overview
+## 1. Architecture overview
 
 Traditionally, container challenges are accessed via `HOST:PORT` (e.g., `ctf.example.com:30001`). Subdomain routing allows access via unique URLs (e.g., `https://c-a1b2c3d4.ctf.example.com`) without exposing ports on the host server.
 
@@ -20,9 +20,9 @@ Traditionally, container challenges are accessed via `HOST:PORT` (e.g., `ctf.exa
 3.  **Cloudflare Tunnel** forwards traffic to the `traefik` container.
 4.  **Traefik** reads the Host header (`c-a1b2c3d4.example.com`), looks up the active Docker container with the matching UUID label, and routes the request to that container's internal port.
 
-It is crucial to understand that the **CTFd Plugin does NOT route traffic**. It only "tags" containers. The routing infrastructure (Traefik + Cloudflare) does the rest.
+The **CTFd Plugin does not route traffic**. It only "tags" containers with labels. The routing infrastructure (Traefik + Cloudflare) does the rest.
 
-### Components & Roles
+### Components and roles
 
 | Component | Role | Description |
 | :--- | :--- | :--- |
@@ -37,19 +37,19 @@ It is crucial to understand that the **CTFd Plugin does NOT route traffic**. It 
 *   **Traefik**: A modern reverse proxy that listens to Docker events. It automatically reconfigures routing rules when a challenge container starts or stops.
 *   **CTFd Plugin**: Generates random subdomains and assigns specific Traefik labels to Docker containers when they are created.
 
-## 3. Configuration Steps
+## 3. Configuration steps
 
-### Step 1: Docker Compose Setup
+### Step 1: Docker compose setup
 
 The setup depends on where your challenges run:
 
-#### Scenario A: Local (All-in-One)
+#### Scenario A: local, all in one
 If CTFd and challenges run on the **same server**:
 1.  Example compose file: [docker-compose.samehost.yml](./docker-compose.samehost.yml).
 2.  Ensure `traefik` and `ctfd` share the `ctfd-network`.
 3.  **Settings**: Traefik and Cloudflared must be running in this compose file.
 
-#### Scenario B: Remote (SSH)
+#### Scenario B: remote over SSH
 If CTFd runs on Server A, but challenges run on **Server B**:
 1.  **Server A (CTFd)**: Does NOT need Traefik/Cloudflared for challenges (only for itself if needed).
 2.  **Server B (Challenges)**: MUST run `traefik` and `cloudflared`.
@@ -62,7 +62,7 @@ If CTFd runs on Server A, but challenges run on **Server B**:
 *   **Docker API** (Both cases): Set `DOCKER_API_VERSION=1.45` environment variable for Traefik to work with modern Docker Engines (v25+).
 *   **Network**: All services (`ctfd`, `traefik`, challenge containers) must share a Docker network (e.g., `ctfd-network`).
 
-### Step 2: Cloudflare Setup (Critical)
+### Step 2: Cloudflare setup
 
 1.  **DNS Record**:
     *   Go to Cloudflare Dashboard -> DNS.
@@ -81,7 +81,7 @@ If CTFd runs on Server A, but challenges run on **Server B**:
 
     ![Cloudflare Tunnel Configuration](images/subdomain-cloudflare-tunnel.png)
 
-### Step 3: Plugin Settings (CTFd Admin)
+### Step 3: Plugin settings in CTFd
 
 Go to **Admin Panel -> Containers -> Settings**:
 
@@ -92,7 +92,7 @@ Go to **Admin Panel -> Containers -> Settings**:
 
 ![CTFd Plugin Settings](images/subdomain-plugin-settings.png)
 
-## 4. How It Works Internally
+## 4. How it works internally
 
 When a user starts a web challenge:
 1.  Plugin generates a UUID (e.g., `ac3fdbd9`).
@@ -110,24 +110,24 @@ When a user starts a web challenge:
 
 ## 5. Troubleshooting
 
-### 404 Page Not Found (from Cloudflare)
+### 404 page not found, from Cloudflare
 *   **Cause**: DNS record missing.
 *   **Fix**: Create `*` CNAME record in Cloudflare DNS.
 
-### 404 Page Not Found (from Traefik)
+### 404 page not found, from Traefik
 *   **Cause**: Traefik is running but cannot see the container or the route.
 *   **Fix**: 
     *   Check if Traefik sees Docker: `docker logs ctfd-traefik-1`. Look for API version errors.
     *   Check container labels: `docker inspect <container_id>`.
 
-### SSL Handshake Failure / Privacy Error
+### SSL handshake failure or privacy error
 *   **Cause**: Using multi-level subdomain (e.g., `abc.challenge.domain.com`) on Cloudflare Free Plan.
 *   **Fix**: Switch to single-level format (`c-abc.domain.com`) by updating Plugin Settings "Base Domain" to root domain.
 
-### Docker API Error ("client version is too old")
+### Docker API error, client version too old
 *   **Cause**: Mismatch between Traefik's default API version and Host Docker Engine.
 *   **Fix**: Add `DOCKER_API_VERSION=1.45` (or higher) to Traefik environment variables in `docker-compose.yml`.
 
-### Settings Not Saving
+### Settings not saving
 *   **Cause**: Frontend-Backend communication issue with unchecked checkboxes.
 *   **Fix**: Already patched in `assets/view.js` and template. Clear browser cache.

@@ -98,7 +98,7 @@ The table is paginated. Account names are resolved in bulk, so the page stays fa
 
 ## Audit log tab
 
-The audit trail records what the plugin did, not just what players did. It is the place to look when something behaved unexpectedly.
+The audit trail records the plugin's own actions alongside player activity. It is the place to look when something behaved unexpectedly.
 
 ![Audit log](images/admin-console-audit.png)
 

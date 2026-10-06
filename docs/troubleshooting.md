@@ -83,7 +83,7 @@ The same cause as above, hit at the moment a player clicked the button. The Dock
 
 **Fix.**
 
-1. Confirm **Connection hostname** is reachable from the player's browser, not only from the Docker host. `localhost` only works when the browser is on the same machine.
+1. Confirm **Connection hostname** is an address the player's browser can reach. Testing it from the Docker host proves nothing, because `localhost` only works when the browser is on the same machine.
 2. Check the port is open in the firewall. Docker publishes ports by writing its own iptables rules, which bypass UFW:
    ```sh
    curl -v http://<connection-host>:<port>/
@@ -111,7 +111,7 @@ If it instead says the cache backend is not Redis, notifications are off and the
 
 ## A player sees another challenge's connection details
 
-This was a bug and is fixed. If you still see it, confirm the plugin files were actually reloaded, since a bind mounted plugin needs a CTFd restart to pick up changes to `assets/view.js`:
+This was a bug and is fixed. If you still see it, confirm the plugin files were reloaded, since a bind mounted plugin needs a CTFd restart to pick up changes to `assets/view.js`:
 
 ```sh
 docker compose restart ctfd

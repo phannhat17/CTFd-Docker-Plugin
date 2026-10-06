@@ -57,7 +57,7 @@ The isolated network blocks direct container to container connections. Measured 
 | Container A to a published port of B through the gateway | **reachable** |
 | Docker DNS listing other containers | **reachable** |
 
-The last two rows are worth understanding.
+The last two rows need an explanation.
 
 Docker's `enable_icc=false` blocks layer 2 traffic between containers on the same bridge. It does not block traffic to the bridge gateway, which is the host itself. A published port is reachable through that gateway, so a player who has code execution inside their own container can reach another team's published port if they know its number. Docker's embedded DNS also resolves container names across the whole network, so the container names are discoverable.
 

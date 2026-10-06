@@ -7,9 +7,9 @@ description: "How this plugin compares with other CTFd container plugins and wit
 
 Several projects solve the same problem. This page puts them side by side so you can pick the right one, or decide that this one is not right for you.
 
-Two notes on how to read it. The facts come from each project's own documentation and from its GitHub metadata on 2026-10-03, not from running them side by side, so treat the other projects' rows as "what their docs claim". And a comparison written by the author of one of the entries is not a neutral source, so the section on where this plugin loses is deliberately specific.
+The facts here come from each project's own documentation and from its GitHub metadata on 2026-10-03, not from running them side by side, so the rows for other projects describe what their docs claim. The author of this plugin wrote the comparison, so treat its self-assessment as an interested one and check the other projects' own docs for anything that matters to your event.
 
-## The landscape
+## The projects
 
 They fall into two groups. Either a plugin that runs inside CTFd and talks to Docker, or a separate orchestration service that is bigger than CTFd.
 
@@ -92,10 +92,10 @@ These are real. If any of them is a hard requirement for your event, use another
 
 ## redpwn/jail is a different tool
 
-It is worth separating, because it solves an adjacent problem rather than competing. redpwn/jail is an nsjail based Docker image that starts one jail per incoming TCP connection, with proof of work and per-connection CPU, memory, PID and disk limits. It is not a CTFd plugin and does not manage per-team instances. You run it as the challenge image itself, on any platform, including this one.
+redpwn/jail solves an adjacent problem rather than competing. It is an nsjail based Docker image that starts one jail per incoming TCP connection, with proof of work and per-connection CPU, memory, PID and disk limits. It is not a CTFd plugin and does not manage per-team instances. You run it as the challenge image itself, on any platform, including this one.
 
 That combination is worth knowing about: this plugin can spawn redpwn/jail as the challenge container, which gives you per-team instance lifecycle from CTFd plus per-connection jailing inside. The two are complementary.
 
 ## Summary
 
-The honest shape of it is this. This plugin is the easiest of the group to stand up, and the only CTFd plugin here with flag sharing detection and an audit trail. It is not the strongest on isolation, it does not scale past one host, and it cannot run multi-container challenges. If your event is one machine and tens to a few hundred teams, it is a good fit. If it is larger, or the challenges are hostile by design, rCTF or kCTF is the better foundation and the extra setup is buying something real.
+This plugin is the easiest of the group to stand up, and the only CTFd plugin here with flag sharing detection and an audit trail. It is the weakest on isolation, it does not scale past one host, and it cannot run multi-container challenges. For one machine and tens to a few hundred teams it is a good fit. Beyond that, or for challenges whose images you do not trust, rCTF or kCTF is the better foundation, and the extra setup pays for real isolation.
