@@ -15,6 +15,7 @@ from CTFd.models import Flags, Solves, db
 from CTFd.exceptions.challenges import ChallengeCreateException, ChallengeUpdateException
 from CTFd.plugins import register_plugin_assets_directory
 from CTFd.plugins.challenges import CHALLENGE_CLASSES, BaseChallenge
+from CTFd.utils.dates import parse_iso_datetime
 from CTFd.utils import get_config
 from CTFd.utils.modes import get_model
 from CTFd.utils.user import get_current_user
@@ -47,6 +48,7 @@ DUMMY_FLAG_CONTENT = '[Container flag - auto-generated per instance]'
 EDITABLE_FIELDS = {
     'name', 'category', 'description', 'attribution', 'state', 'max_attempts',
     'requirements', 'next_id', 'value',
+    'scheduled_at',
     'image', 'internal_port', 'internal_ports', 'command',
     'connection_type', 'connection_info',
     'container_connection_type', 'container_connection_info',
@@ -137,6 +139,16 @@ class ContainerChallengeType(BaseChallenge):
             for key, value in parsed.items():
                 data.setdefault(key, value)
 
+        if 'scheduled_at' in data:
+            try:
+                data['scheduled_at'] = parse_iso_datetime(data['scheduled_at'])
+            except ValueError:
+                if creating:
+                    raise ValueError(
+                        "Invalid 'scheduled_at' — expected ISO 8601 datetime"
+                    )
+                raise ValueError("Invalid input for 'scheduled_at'")
+
         for key, raw_value in data.items():
             if key in UI_ONLY_FIELDS:
                 continue
@@ -144,7 +156,7 @@ class ContainerChallengeType(BaseChallenge):
             if target not in EDITABLE_FIELDS:
                 continue
             value = _coerce(target, raw_value)
-            if value is None and not creating:
+            if value is None and not creating and target != 'scheduled_at':
                 # Empty input on update means "leave as is" (matches CTFd).
                 continue
             setattr(challenge, target, value)
@@ -276,6 +288,9 @@ class ContainerChallengeType(BaseChallenge):
             "attribution": challenge.attribution,
             "category": challenge.category,
             "state": challenge.state,
+            "scheduled_at": (
+                challenge.scheduled_at.isoformat() if challenge.scheduled_at else None
+            ),
             "max_attempts": challenge.max_attempts,
             "type": challenge.type,
             # Static text shown above the flag box. Deliberately NOT the
