@@ -49,6 +49,7 @@ EDITABLE_FIELDS = {
     'requirements', 'next_id', 'value',
     'image', 'internal_port', 'internal_ports', 'command',
     'connection_type', 'connection_info',
+    'container_connection_type', 'container_connection_info',
     'flag_mode', 'flag_prefix', 'flag_suffix', 'random_flag_length',
     'container_initial', 'container_minimum', 'container_decay', 'decay_function',
     'pids_limit',
