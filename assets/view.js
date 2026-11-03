@@ -192,7 +192,9 @@ function renderConnectionInfo(connection, parent) {
     } else if (type === "https") {
         appendLink(parent, "https://" + connection.host);
     } else if (type === "http" || type === "web" || type === "url") {
-        var scheme = window.location.protocol === "https:" ? "https://" : "http://";
+        var scheme = type === "http"
+            ? "http://"
+            : window.location.protocol + "//";
         var hosts = hasPorts
             ? Object.values(ports).map(function (external) {
                 return scheme + connection.host + ":" + external;

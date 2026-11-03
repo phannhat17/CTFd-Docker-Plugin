@@ -119,14 +119,15 @@
 	<label>
 		Connect type<br>
 		<small class="form-text text-muted">
-			Connect via HTTP or TCP
+			Connect via HTTP, HTTPS, or TCP (Netcat)
 		</small>
 	</label>
 	<select type="text" class="form-control" name="connection_type" placeholder="Connect via" id="connect-type"
-		title="Connect via web or tcp" required>
+		title="Connect via HTTP, HTTPS, or TCP (Netcat)" required>
 		<option value="" selected disabled>Choose a value...</option>
 		<option value="http">Web (HTTP)</option>
-		<option value="tcp">TCP</option>
+		<option value="https">Web (HTTPS)</option>
+		<option value="tcp">TCP (Netcat)</option>
 	</select>
 </div>
 
