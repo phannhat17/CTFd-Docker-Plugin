@@ -142,7 +142,7 @@ class ContainerChallengeType(BaseChallenge):
         if 'scheduled_at' in data:
             try:
                 data['scheduled_at'] = parse_iso_datetime(data['scheduled_at'])
-            except ValueError:
+            except (TypeError, ValueError):
                 if creating:
                     raise ValueError(
                         "Invalid 'scheduled_at' — expected ISO 8601 datetime"
