@@ -189,17 +189,19 @@ function renderConnectionInfo(connection, parent) {
             }
             parent.append(code, document.createElement("br"));
         });
-    } else if (type === "https") {
-        appendLink(parent, "https://" + connection.host);
-    } else if (type === "http" || type === "web" || type === "url") {
-        var scheme = type === "http"
-            ? "http://"
-            : window.location.protocol + "//";
+    } else if (type === "http" || type === "https" || type === "web" || type === "url") {
+        var scheme = type === "https"
+            ? "https://"
+            : type === "http"
+                ? "http://"
+                : window.location.protocol + "//";
         var hosts = hasPorts
             ? Object.values(ports).map(function (external) {
-                return scheme + connection.host + ":" + external;
+                var port = type === "https" && Number(external) === 443 ? "" : ":" + external;
+                return scheme + connection.host + port;
             })
-            : [scheme + connection.host + ":" + connection.port];
+            : [scheme + connection.host
+                + (type === "https" && Number(connection.port) === 443 ? "" : ":" + connection.port)];
         hosts.forEach(function (url) { appendLink(parent, url); });
     } else {
         // Unknown/custom type: show host:port pairs
